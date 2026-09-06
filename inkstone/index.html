@@ -210,6 +210,19 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
 #sel-pop .n-btn,#sel-pop .s-btn{font-family:var(--sans);font-size:12px;color:var(--paper);padding:3px 8px;margin-left:4px;border-left:1px solid rgba(255,255,255,.25)}
 #sel-pop .n-btn:hover,#sel-pop .s-btn:hover{color:var(--night)}
 #sel-pop .s-btn{border-left:none}
+/* 划词即写：工具条内联输入行，不遮挡正文 */
+#sel-pop{display:block}
+#sel-pop .row1{display:flex;align-items:center;gap:2px}
+#sel-pop .note-row{display:none;align-items:center;gap:7px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.18)}
+#sel-pop.open-note .note-row{display:flex}
+#sel-pop .note-row input{flex:1;width:230px;background:none;border:none;border-bottom:1px solid rgba(255,255,255,.4);color:var(--paper);font-family:var(--serif);font-size:13px;padding:4px 1px;outline:none;line-height:1.6}
+#sel-pop .note-row input::placeholder{color:rgba(250,250,247,.42)}
+#sel-pop .note-row input:focus{border-bottom-color:var(--paper)}
+#sel-pop .note-row .save{font-family:var(--sans);font-size:12px;color:var(--night);background:var(--paper);padding:4px 11px;cursor:pointer;white-space:nowrap;flex:none}
+#sel-pop .note-row .save:hover{background:#ffd500}
+#sel-pop .note-row .hint{font-family:var(--mono);font-size:9.5px;color:rgba(250,250,247,.4);flex:none;letter-spacing:.03em}
+#sel-pop.open-note .n-btn{color:var(--night);background:var(--paper)}
+#sel-pop .n-btn.active{background:var(--paper);color:var(--night)}
 /* 弹窗 */
 .modal-mask{position:fixed;inset:0;background:rgba(26,26,26,.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal{background:var(--paper);border:1px solid var(--line);width:560px;max-width:100%;max-height:88vh;display:flex;flex-direction:column}
@@ -458,13 +471,20 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
 
 <!-- 选区弹层 -->
 <div id="sel-pop" hidden data-page-node-id="sIP7uuvhzA6Apl1iriPxMI">
-  <span class="sw c-cinnabar" data-color="cinnabar" title="朱砂" data-page-node-id="SHv4oXgnFgKnbBdapkM8Lo"></span>
-  <span class="sw c-indigo" data-color="indigo" title="黛蓝" data-page-node-id="I1Y1q9nMziP8Zaz3DoQJrg"></span>
-  <span class="sw c-ochre" data-color="ochre" title="藤黄" data-page-node-id="Q3sDcBcdttpBRrV0NSEFYC"></span>
-  <span class="sw c-moss" data-color="moss" title="苔绿" data-page-node-id="yXDgl5z9k4vW5QAjs627mw"></span>
-  <span class="u-btn" data-type="underline" title="下划线" data-page-node-id="sCbzMNjHNuqmG4msXDUKmn"></span>
-  <button class="n-btn" data-type="note" data-page-node-id="4CS9OcH82OcYBhXaFfdRvu">批注…</button>
-  <button class="s-btn" data-type="search" data-page-node-id="qK3vN8xTZLpSelSearchBtn1">检索</button>
+  <div class="row1" data-page-node-id="selPopRow1x9K2m">
+    <span class="sw c-cinnabar" data-color="cinnabar" title="朱砂" data-page-node-id="SHv4oXgnFgKnbBdapkM8Lo"></span>
+    <span class="sw c-indigo" data-color="indigo" title="黛蓝" data-page-node-id="I1Y1q9nMziP8Zaz3DoQJrg"></span>
+    <span class="sw c-ochre" data-color="ochre" title="藤黄" data-page-node-id="Q3sDcBcdttpBRrV0NSEFYC"></span>
+    <span class="sw c-moss" data-color="moss" title="苔绿" data-page-node-id="yXDgl5z9k4vW5QAjs627mw"></span>
+    <span class="u-btn" data-type="underline" title="下划线" data-page-node-id="sCbzMNjHNuqmG4msXDUKmn"></span>
+    <button class="n-btn" data-type="note" data-page-node-id="4CS9OcH82OcYBhXaFfdRvu">想法</button>
+    <button class="s-btn" data-type="search" data-page-node-id="qK3vN8xTZLpSelSearchBtn1">检索</button>
+  </div>
+  <div class="note-row" data-page-node-id="selNoteRowB7pQ4t">
+    <input id="sel-note-input" type="text" placeholder="写点想法…" maxlength="600" data-page-node-id="selNoteInputK3mR8v">
+    <button class="save" data-page-node-id="selNoteSaveW2nL6d">存 ⏎</button>
+    <span class="hint" data-page-node-id="selNoteHintT5xF1c">选色即存</span>
+  </div>
 </div>
 
 <!-- 批注弹窗 -->
@@ -1506,6 +1526,8 @@ function applyPdfMarks() {
         const mk = document.createElement('mark');
         mk.className = 'hl ' + (ann.type === 'underline' ? 'u ' : '') + (ann.color || 'cinnabar') + (ann.note ? ' has-note' : '');
         mk.dataset.annId = ann.id;
+        /* 想法挂到 title 上，鼠标悬浮即可回看（划词即写之后，这条更常用了） */
+        if (ann.note) mk.title = ann.note;
         nd.parentNode.insertBefore(mk, mid);
         mk.appendChild(mid);
       } catch (e) { /* 单条失败不影响其余批注 */ }
@@ -1545,7 +1567,10 @@ function toggleSpeak() {
 }
 
 /* ================= M6 · 批注 ================= */
-function captureSel() {
+/* 划词瞬间的快照。必须快照：内联想法输入框一聚焦，浏览器就会清掉选区，
+   那时再读 selection 已经是空的，保存必然失败。 */
+let _selSnap = null, _selRect = null, _lastColor = 'cinnabar';
+function captureSelRaw() {
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed) return null;
   const text = sel.toString().replace(/\s+/g, ' ').trim();
@@ -1571,11 +1596,13 @@ function captureSel() {
   } catch (e) { nth = 0; }
   return { text: normalizeCJK(text), nth };
 }
-async function addAnnotation(color, type, note, presetText) {
+/* 优先用划词快照，没有则退回实时读取（键盘等不走 mouseup 的场景） */
+function captureSel() { return _selSnap || captureSelRaw(); }
+async function addAnnotation(color, type, note, presetText, presetNth) {
   const b = S.current; if (!b) return;
   color = color || 'cinnabar';
   let text, nth = 0;
-  if (presetText) text = presetText;
+  if (presetText) { text = presetText; nth = presetNth || 0; }
   else { const s = captureSel(); if (!s) return; text = s.text; nth = s.nth || 0; }
   const a = {
     /* PDF 用当前页反查所属章节 —— S.chapter 只由目录点击更新，翻页时不会变，
@@ -1588,8 +1615,10 @@ async function addAnnotation(color, type, note, presetText) {
   };
   S.anns.push(a); S.allAnns.push(a);
   await dbPut('anns', a);
+  _lastColor = color;
+  _selSnap = null;
   try { window.getSelection().removeAllRanges(); } catch (e) {}
-  $('#sel-pop').hidden = true;
+  hideSelPop();
   if (b.format !== 'pdf') renderChapter(S.chapter);
   else applyPdfMarks();   // PDF 不整页重渲染，只把新批注回填到文本层
   renderAnnotSidebar(); renderLibrary();
@@ -2348,35 +2377,88 @@ document.addEventListener('click', e => {
 
 /* ================= 选区批注交互 ================= */
 let _noteState = null; // {mode:'new', text} | {mode:'edit', ann}
+/* 收起并清空划词工具条（含内联想法行） */
+function hideSelPop() {
+  const pop = $('#sel-pop');
+  if (!pop) return;
+  pop.hidden = true;
+  pop.classList.remove('open-note');
+  const i = $('#sel-note-input'); if (i) i.value = '';
+  const nb = pop.querySelector('.n-btn'); if (nb) nb.classList.remove('active');
+  _selSnap = null; _selRect = null;
+}
+function positionSelPop() {
+  const pop = $('#sel-pop'), r = _selRect;
+  if (!pop || pop.hidden || !r) return;
+  const pw = pop.offsetWidth || 220, ph = pop.offsetHeight || 36;
+  pop.style.left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.left + r.width / 2 - pw / 2)) + 'px';
+  /* 上方空间不够时翻到选区下面，别被窗口顶边切掉 */
+  const above = r.top - ph - 10;
+  pop.style.top = (above >= 8 ? above : Math.min(window.innerHeight - ph - 8, r.bottom + 10)) + 'px';
+}
+/* 展开/收起内联想法输入行。展开后工具条变高，必须重新定位。 */
+function toggleSelNote(open) {
+  const pop = $('#sel-pop');
+  const on = open === undefined ? !pop.classList.contains('open-note') : open;
+  pop.classList.toggle('open-note', on);
+  pop.querySelector('.n-btn').classList.toggle('active', on);
+  positionSelPop();
+  if (on) setTimeout(() => { const i = $('#sel-note-input'); if (i) i.focus(); }, 30);
+}
+function selNoteText() { const i = $('#sel-note-input'); return i ? i.value.trim() : ''; }
+function saveSelNote(color) {
+  const s = captureSel(); if (!s) { hideSelPop(); return; }
+  addAnnotation(color || _lastColor, 'highlight', selNoteText(), s.text, s.nth);
+}
 document.addEventListener('mouseup', e => {
   const pop = $('#sel-pop');
+  /* 点工具条内部（尤其是想法输入框）时不要重算，否则焦点和选区都会被搅乱 */
+  if (e.target && e.target.closest && e.target.closest('#sel-pop')) return;
   const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.toString().trim()) { pop.hidden = true; return; }
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) { hideSelPop(); return; }
   /* PDF 现在有文本层，同样支持划词；EPUB/TXT/MD 走原路径 */
   const inPdf = !!(S.current && S.current.format === 'pdf' && $('#pdf-text-layer').contains(sel.anchorNode));
-  if (!inPdf && !$('#reader-content').contains(sel.anchorNode)) { pop.hidden = true; return; }
-  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  if (!inPdf && !$('#reader-content').contains(sel.anchorNode)) { hideSelPop(); return; }
+  const s = captureSelRaw();          // 立刻快照：输入框聚焦后选区就没了
+  if (!s) { hideSelPop(); return; }
+  _selSnap = s;
+  _selRect = sel.getRangeAt(0).getBoundingClientRect();
   pop.hidden = false;
-  const pw = pop.offsetWidth || 220, ph = pop.offsetHeight || 36;
-  pop.style.left = Math.max(8, Math.min(window.innerWidth - pw - 8, rect.left + rect.width / 2 - pw / 2)) + 'px';
-  pop.style.top = Math.max(8, rect.top - ph - 10) + 'px';
+  pop.classList.remove('open-note');
+  pop.querySelector('.n-btn').classList.remove('active');
+  const i = $('#sel-note-input'); if (i) i.value = '';
+  positionSelPop();
 });
-$('#sel-pop').addEventListener('mousedown', e => e.preventDefault());
+/* 输入框要能正常聚焦，不能无差别 preventDefault */
+$('#sel-pop').addEventListener('mousedown', e => {
+  if (e.target && e.target.id === 'sel-note-input') return;
+  e.preventDefault();
+});
+$('#sel-note-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); saveSelNote(null); }
+  else if (e.key === 'Escape') {
+    /* 必须阻断冒泡：否则会一路冒到 document 的 Esc 监听，把整个工具条关掉，
+       「先收输入行、再关工具条」的两段式就没了 */
+    e.preventDefault(); e.stopPropagation();
+    toggleSelNote(false);
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const pop = $('#sel-pop');
+  if (pop && !pop.hidden) { hideSelPop(); return; }
+});
 $('#sel-pop').addEventListener('click', e => {
   const sw = e.target.closest('.sw'), ub = e.target.closest('.u-btn'), nb = e.target.closest('.n-btn');
-  const sb = e.target.closest('.s-btn');
-  if (sw) { addAnnotation(sw.dataset.color, 'highlight', ''); return; }
-  if (ub) { addAnnotation(null, 'underline', ''); return; }
-  if (nb) {
-    const s = captureSel(); if (!s) return;
-    _noteState = { mode: 'new', text: s.text, color: 'cinnabar' };
-    openNoteModal(null, s.text);
-    return;
-  }
+  const sb = e.target.closest('.s-btn'), sv = e.target.closest('.save');
+  if (nb) { toggleSelNote(); return; }
+  if (sv) { saveSelNote(null); return; }
+  if (sw) { const s = captureSel(); if (s) addAnnotation(sw.dataset.color, 'highlight', selNoteText(), s.text, s.nth); else hideSelPop(); return; }
+  if (ub) { const s = captureSel(); if (s) addAnnotation(_lastColor, 'underline', selNoteText(), s.text, s.nth); else hideSelPop(); return; }
   /* 划词检索：拿选中文字直接跨书搜索（PDF 文本层已归一化，可直接命中正文） */
   if (sb) {
     const s = captureSel(); if (!s) return;
-    $('#sel-pop').hidden = true;
+    hideSelPop();
     openModal('search-modal');
     $('#search-input').value = s.text;
     runSearch();
@@ -2415,9 +2497,8 @@ $('#note-save').addEventListener('click', async () => {
       else applyPdfMarks();
       renderAnnotSidebar();
     }
-  } else if (_noteState) {
-    await addAnnotation(color, 'highlight', note, _noteState.text);
   }
+  /* 'new' 分支已废弃 —— 划词后写想法改为工具条内联输入，不再开全屏弹窗 */
   closeModal('note-modal'); _noteState = null;
 });
 $('#note-del').addEventListener('click', async () => {
