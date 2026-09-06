@@ -99,6 +99,16 @@ open inkstone/index.html
 > 首次打开需要联网加载两个 CDN 依赖（pdf.js 和 JSZip），之后断网也能用。
 > 手机浏览器打开也能用，会自动适配窄屏。
 
+### 装成应用（PWA）
+
+墨砚是一个标准 PWA，可以装成手机 / 电脑上的独立应用：桌面图标、全屏无地址栏、**断网也能读**，数据仍然只存在本机。
+
+- **iPhone / iPad**：用 Safari 打开线上链接 → 底部「分享」→「添加到主屏幕」。
+  ⚠️ iOS 会给主屏幕图标一份**独立的存储**，和 Safari 里的不互通 —— 先在浏览器里「设置 → 导出完整备份」，再到图标里「从备份恢复」一次。
+- **Android（Chrome）**：打开链接 → 菜单「安装应用」，或设置面板里点「安装到本机」。
+- **macOS / Windows（Chrome / Edge）**：地址栏右侧 ⊕「安装」，或设置面板里点「安装到本机」。
+- **macOS Safari**：菜单「文件 → 添加到程序坞」。
+
 ---
 
 ## 技术说明
@@ -134,6 +144,9 @@ open inkstone/index.html
 ```
 inkstone/
   index.html          # 全部代码，约 2100 行
+  manifest.webmanifest  # PWA 清单（名称 / 图标 / 独立窗口）
+  sw.js               # Service Worker（离线缓存；页面导航 network-first，发版即生效）
+  icon-*.png          # 应用图标（512 / 192 / 180 / maskable）
 墨砚Inkstone_产品PRD_v1.0.md    # 产品需求文档
 技术方案_墨砚Web版.md            # 技术方案
 HANDOFF_墨砚.md                 # 迭代交接记录
