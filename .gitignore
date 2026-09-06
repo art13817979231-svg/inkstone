@@ -1,0 +1,10 @@
+# WorkBuddy 项目数据（记忆日志、会话缓存等）
+.workbuddy/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+*.log
+
+# 依赖
+node_modules/

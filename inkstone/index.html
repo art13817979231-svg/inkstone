@@ -1,0 +1,2692 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="ZSSEAPFAdIwjqjtHlQMFq1">
+<head data-page-node-id="4pqKqTU2vBYTZXvPbrxmzL">
+<meta charset="utf-8" data-page-node-id="26KlJ16lkAK5lU4g76o0q5">
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="U6Ab9XLkvPDSK46GZy82ZQ">
+<title>墨砚 Inkstone · 阅读器</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23fafaf7'/%3E%3Ccircle cx='32' cy='36' r='14' fill='%231a1a1a'/%3E%3Ccircle cx='27' cy='18' r='4' fill='%231a1a1a'/%3E%3C/svg%3E" data-page-node-id="C2VlrvEaEktexjhh8drwuD">
+<style>
+/* ============ 墨砚 Inkstone · Swiss 极简设计系统 ============ */
+:root{
+  --paper:#fafaf7; --ink:#1a1a1a; --sub:#333; --body:#666; --aux:#999; --line:#ccc;
+  --cinnabar:#c8102e; --indigo:#34558b; --ochre:#d4a017; --moss:#6a8759;
+  --night:#d4b886;
+  --serif:"Songti SC","STSong","Noto Serif SC",serif;
+  --sans:"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"Courier New",Courier,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--serif);overflow:hidden}
+button{font-family:var(--sans);cursor:pointer;background:none;border:none;color:inherit}
+input,select,textarea{font-family:var(--sans);font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:2px;padding:7px 10px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--ink)}
+::selection{background:rgba(200,16,46,.22)}
+a{color:var(--cinnabar)}
+
+/* ---------- 顶栏（书架） ---------- */
+#lib-bar{height:58px;display:flex;align-items:center;gap:16px;padding:0 28px;border-bottom:1px solid var(--line);background:var(--paper);position:relative;z-index:5}
+.brand{font-family:var(--serif);font-weight:700;font-size:21px;letter-spacing:.04em}
+.brand .en{font-family:var(--mono);font-size:11px;color:var(--aux);letter-spacing:.28em;margin-left:8px;font-weight:400}
+.brand .dot{display:inline-block;width:9px;height:9px;background:var(--ink);border-radius:50%;margin-right:10px;vertical-align:2px}
+#lib-bar .grow{flex:1}
+.icon-btn{font-size:13px;color:var(--body);padding:7px 13px;letter-spacing:.05em;border:1px solid transparent}
+.icon-btn:hover{color:var(--ink);border-color:var(--line)}
+.btn{font-size:13px;padding:8px 18px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);letter-spacing:.08em}
+.btn:hover{background:var(--cinnabar);border-color:var(--cinnabar)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.ghost:hover{background:var(--ink);color:var(--paper)}
+.btn.small{padding:5px 12px;font-size:12px}
+
+/* ---------- 书架 ---------- */
+#view-library{height:calc(100vh - 58px);overflow-y:auto}
+.lib-wrap{max-width:1080px;margin:0 auto;padding:34px 28px 90px}
+.lib-stats{font-family:var(--sans);font-size:13px;color:var(--body);letter-spacing:.05em;margin-bottom:34px;display:flex;flex-wrap:wrap;gap:26px}
+.lib-stats b{font-family:var(--mono);font-size:16px;color:var(--ink);font-weight:400;margin:0 4px}
+/* 书架排序 / 筛选工具条 */
+.lib-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-18px 0 28px}
+.lib-tools select{font-family:var(--sans);font-size:12px;padding:5px 9px;border:1px solid var(--line);background:var(--paper);color:var(--body);cursor:pointer}
+.lt-filters{display:flex;gap:6px;flex-wrap:wrap}
+.lt-filters button{font-family:var(--sans);font-size:12px;padding:5px 11px;border:1px solid var(--line);background:none;color:var(--aux);cursor:pointer;letter-spacing:.03em}
+.lt-filters button:hover{color:var(--body)}
+.lt-filters button.cur{border-color:var(--ink);color:var(--ink)}
+.lt-count{font-family:var(--mono);font-size:11px;color:var(--aux);margin-left:auto}
+.backup-hint{font-family:var(--sans);font-size:12px;color:#8a6d1f;background:#fdf6e3;border-left:3px solid #d4b886;padding:9px 14px;margin:-20px 0 30px;cursor:pointer;letter-spacing:.03em;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.backup-hint:hover{background:#fbf0d4}
+.backup-hint::after{content:"→";font-family:var(--mono);color:#b3934f}
+#book-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:30px 26px}
+.book-card{cursor:pointer;position:relative}
+.book-card .cover{aspect-ratio:3/4;border:1px solid var(--line);background:#fff;overflow:hidden;position:relative;transition:transform .18s ease}
+.book-card:hover .cover{transform:translateY(-5px);border-color:var(--ink)}
+.book-card .cover img{width:100%;height:100%;object-fit:cover;display:block}
+.book-card .fmt{position:absolute;top:8px;left:8px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:10px;padding:2px 6px;letter-spacing:.1em}
+.book-card .annbadge{position:absolute;top:8px;right:8px;background:var(--cinnabar);color:#fff;font-family:var(--mono);font-size:10px;padding:2px 6px}
+.book-card .meta{margin-top:10px}
+.book-card .t{font-size:14px;color:var(--sub);line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.9em}
+.book-card .a{font-family:var(--sans);font-size:11px;color:var(--aux);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.book-card .p{font-family:var(--mono);font-size:11px;color:var(--aux);margin-top:3px}
+.book-card .del{position:absolute;top:6px;right:6px;z-index:3;background:rgba(26,26,26,.82);color:#fff;font-family:var(--mono);font-size:11px;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;opacity:0;transition:opacity .15s}
+.book-card:hover .del{opacity:1}
+.book-card .del:hover{background:var(--cinnabar)}
+#import-card{aspect-ratio:3/4;border:1.5px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;cursor:pointer;color:var(--aux);transition:all .18s}
+#import-card:hover{border-color:var(--ink);color:var(--ink)}
+#import-card .plus{font-size:44px;font-weight:200;font-family:var(--sans);line-height:1}
+#import-card .txt{font-size:13px;font-family:var(--sans);letter-spacing:.1em}
+#import-card .fmts{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--line)}
+.onboard{border:1px solid var(--line);padding:46px 40px;text-align:center;margin-bottom:40px}
+.onboard h2{font-size:26px;font-weight:700;letter-spacing:.12em;margin-bottom:14px}
+.onboard p{font-family:var(--sans);font-size:13px;color:var(--body);line-height:2;margin-bottom:22px}
+.onboard .k{font-family:var(--mono);font-size:11px;color:var(--aux);letter-spacing:.2em;margin-top:18px}
+
+/* ---------- 阅读器 ---------- */
+#view-reader{height:100vh;display:flex;flex-direction:column;position:relative}
+#reader-bar{height:52px;display:flex;align-items:center;gap:4px;padding:0 16px;border-bottom:1px solid var(--line);flex:none;transition:opacity .3s,transform .3s;background:var(--paper);z-index:6}
+#view-reader.chrome-hidden #reader-bar{opacity:0;transform:translateY(-100%);pointer-events:none}
+#rb-title{font-size:14px;color:var(--sub);letter-spacing:.06em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 10px}
+#rb-chapter{font-family:var(--mono);font-size:11px;color:var(--aux)}
+#reader-stage{flex:1;overflow-y:auto;position:relative}
+#text-view{padding:58px 26px 140px}
+#reader-content{max-width:680px;margin:0 auto;font-size:var(--fs,19px);line-height:var(--lh,1.95);color:var(--rfg,#1a1a1a);letter-spacing:.01em;font-family:var(--rfont,var(--serif));transition:font-family .12s}
+#reader-content p{margin:0 0 var(--para,1em);text-indent:2em}
+#reader-content h1,#reader-content h2,#reader-content h3,#reader-content h4,#reader-content h5,#reader-content h6{text-indent:0;margin:1.9em 0 .9em;font-weight:700;line-height:1.5;color:var(--rfg,#1a1a1a);font-family:var(--rhead,var(--sans))}
+#reader-content h1{font-size:1.7em;letter-spacing:.06em}
+#reader-content h2{font-size:1.35em}
+#reader-content h3{font-size:1.15em}
+#reader-content blockquote{margin:1.4em 0;padding:.1em 0 .1em 1.2em;border-left:2.5px solid var(--cinnabar);color:var(--rsub,#555)}
+#reader-content blockquote p{text-indent:0;margin:.4em 0}
+#reader-content ul,#reader-content ol{margin:1em 0 1.4em 2.2em;text-indent:0}
+#reader-content li{margin:.45em 0}
+#reader-content pre{font-family:var(--mono);font-size:.82em;background:rgba(26,26,26,.05);padding:14px 18px;overflow-x:auto;margin:1.3em 0;text-indent:0;line-height:1.7}
+#reader-content code{font-family:var(--mono);font-size:.85em;background:rgba(26,26,26,.06);padding:1px 5px}
+#reader-content pre code{background:none;padding:0}
+#reader-content hr{border:none;border-top:1px solid var(--line);margin:2.4em auto;width:36%}
+#reader-content a{text-decoration:none;border-bottom:1px solid currentColor}
+#reader-content::after{content:"· 完 ·";display:block;text-align:center;color:var(--aux);font-size:12px;letter-spacing:.4em;margin-top:70px;font-family:var(--sans)}
+/* 主题 */
+#text-view[data-theme="ink"]{background:#1a1a1a}#text-view[data-theme="ink"] #reader-content{--rfg:#e6e1d6;--rsub:#b5b0a6}
+#text-view[data-theme="dusk"]{background:#595959}#text-view[data-theme="dusk"] #reader-content{--rfg:#f2f2f2;--rsub:#d5d5d5}
+#text-view[data-theme="night"]{background:#221d12}#text-view[data-theme="night"] #reader-content{--rfg:#d4b886;--rsub:#c3a878}
+#text-view[data-theme="ink"] #reader-content pre,#text-view[data-theme="dusk"] #reader-content pre,#text-view[data-theme="night"] #reader-content pre{background:rgba(255,255,255,.07)}
+#text-view[data-theme="ink"] #reader-content code,#text-view[data-theme="dusk"] #reader-content code,#text-view[data-theme="night"] #reader-content code{background:rgba(255,255,255,.1)}
+#text-view[data-theme="ink"] #reader-content hr,#text-view[data-theme="dusk"] #reader-content hr,#text-view[data-theme="night"] #reader-content hr{border-color:rgba(255,255,255,.25)}
+#text-view[data-theme="ink"] ::selection,#text-view[data-theme="dusk"] ::selection,#text-view[data-theme="night"] ::selection{background:rgba(212,184,134,.35)}
+/* 高亮批注 */
+mark.hl{background:transparent;color:inherit;padding:0 1px}
+mark.hl.cinnabar{background:rgba(200,16,46,.16)}
+mark.hl.indigo{background:rgba(52,85,139,.17)}
+mark.hl.ochre{background:rgba(212,160,23,.24)}
+mark.hl.moss{background:rgba(106,135,89,.22)}
+mark.hl.hit{background:rgba(255,213,0,.5);outline:1px solid rgba(212,160,23,.8)}
+mark.hl.u{background:transparent;border-bottom:2.5px solid transparent;padding:0}
+mark.hl.u.cinnabar{border-bottom-color:var(--cinnabar)}
+mark.hl.u.indigo{border-bottom-color:var(--indigo)}
+mark.hl.u.ochre{border-bottom-color:var(--ochre)}
+mark.hl.u.moss{border-bottom-color:var(--moss)}
+mark.hl.has-note::after{content:"✎";font-size:.62em;color:var(--cinnabar);vertical-align:super;margin-left:2px}
+/* PDF 视图 */
+#pdf-view{padding:26px 0 120px;display:flex;flex-direction:column;align-items:center;gap:18px}
+#pdf-canvas-wrap{position:relative;max-width:96%}
+#pdf-canvas{display:block;margin:0 auto;max-width:100%;border:1px solid var(--line);background:#fff;box-shadow:0 1px 14px rgba(0,0,0,.08)}
+/* PDF 文本层：pdf.js 官方 text_layer CSS 的精简内联版（单文件不能引外部样式表）
+   —— 文字必须保持 transparent，否则会与 canvas 上的原字重影；高亮靠背景色呈现 */
+#pdf-text-layer{position:absolute;left:0;top:0;overflow:hidden;line-height:1;text-align:initial;
+  transform-origin:0 0;opacity:1;forced-color-adjust:none;text-size-adjust:none;pointer-events:auto}
+#pdf-text-layer span{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}
+#pdf-text-layer span.markedContent{top:0;height:0}
+#pdf-text-layer ::selection{background:rgba(200,16,46,.22)}
+#pdf-text-layer mark.hl{color:transparent;background:transparent;padding:0}
+#pdf-text-layer mark.hl.cinnabar{background:rgba(200,16,46,.20)}
+#pdf-text-layer mark.hl.indigo{background:rgba(52,85,139,.21)}
+#pdf-text-layer mark.hl.ochre{background:rgba(212,160,23,.26)}
+#pdf-text-layer mark.hl.moss{background:rgba(106,135,89,.24)}
+#pdf-text-layer mark.hl.u{background:transparent;border-bottom:2.5px solid transparent}
+#pdf-text-layer mark.hl.u.cinnabar{border-bottom-color:var(--cinnabar)}
+#pdf-text-layer mark.hl.u.indigo{border-bottom-color:var(--indigo)}
+#pdf-text-layer mark.hl.u.ochre{border-bottom-color:var(--ochre)}
+#pdf-text-layer mark.hl.u.moss{border-bottom-color:var(--moss)}
+#pdf-text-layer mark.hl.has-note{box-shadow:inset 0 -1px 0 var(--cinnabar)}
+#pdf-nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:14px;padding:9px 20px;z-index:8}
+#pdf-nav button{color:var(--paper);font-family:var(--mono);font-size:13px;padding:2px 6px}
+#pdf-nav button:hover{color:var(--night)}
+#pdf-page-label{font-family:var(--mono);font-size:12px;letter-spacing:.1em;min-width:70px;text-align:center}
+#pdf-zoom{display:flex;gap:6px;border-left:1px solid rgba(255,255,255,.25);padding-left:14px}
+/* 抽屉与面板（共用） */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:340px;max-width:92vw;background:var(--paper);border-left:1px solid var(--line);z-index:20;transform:translateX(102%);transition:transform .25s ease;display:flex;flex-direction:column}
+.drawer.open{transform:translateX(0)}
+.panel-head{height:52px;flex:none;display:flex;align-items:center;padding:0 18px;border-bottom:1px solid var(--line);font-size:14px;letter-spacing:.08em}
+.panel-head .grow{flex:1}
+.panel-head .x{font-family:var(--mono);color:var(--aux);font-size:16px;padding:4px 8px}
+.panel-head .x:hover{color:var(--ink)}
+.panel-body{flex:1;overflow-y:auto;padding:14px 0}
+#toc-drawer .panel-body a{display:block;padding:8px 20px;font-size:14px;color:var(--body);text-decoration:none;border-left:2.5px solid transparent}
+#toc-drawer .panel-body a:hover{color:var(--ink);background:rgba(26,26,26,.03)}
+#toc-drawer .panel-body a.cur{border-left-color:var(--cinnabar);color:var(--ink);font-weight:700}
+#toc-drawer .panel-body a.lv1{padding-left:38px;font-size:13.5px}
+#toc-drawer .panel-body a.lv2{padding-left:54px;font-size:13px;color:#666}
+#toc-drawer .panel-body a.lv3{padding-left:70px;font-size:12.5px;color:#666}
+/* 批注侧栏 */
+.ann-item{padding:13px 18px;border-bottom:1px solid rgba(204,204,204,.5)}
+.ann-item .row1{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ann-item .chip{width:10px;height:10px;flex:none;border-radius:50%}
+.ann-item .chip.u{border-radius:0;height:3px;margin-top:3px}
+.ann-item .when{font-family:var(--mono);font-size:10px;color:var(--aux)}
+.ann-item .row1 .grow{flex:1}
+.ann-item .ops{font-family:var(--sans);font-size:11px;color:var(--aux)}
+.ann-item .ops button:hover{color:var(--cinnabar)}
+.ann-item .q{font-size:13px;color:var(--sub);line-height:1.7;border-left:2px solid var(--line);padding-left:10px}
+.ann-item .n{font-size:13px;color:var(--ink);background:rgba(200,16,46,.06);padding:8px 10px;margin-top:7px;line-height:1.7;white-space:pre-wrap}
+.ann-empty{padding:40px 20px;text-align:center;color:var(--aux);font-size:13px;font-family:var(--sans);line-height:2.1}
+.chip.c-cinnabar{background:var(--cinnabar)}.chip.c-indigo{background:var(--indigo)}.chip.c-ochre{background:var(--ochre)}.chip.c-moss{background:var(--moss)}
+/* 定位命中闪烁：跳转后必须让用户一眼看到"跳到哪儿了" */
+@keyframes inkFlash{0%,100%{box-shadow:0 0 0 0 rgba(200,16,46,0);background-color:transparent}
+  25%,60%{box-shadow:0 0 0 3px rgba(200,16,46,.35);background-color:rgba(200,16,46,.16)}}
+mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)}
+/* AI 面板 */
+#ai-panel{width:400px}
+.ai-tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.ai-tabs button{flex:1;padding:12px 0;font-size:13px;letter-spacing:.15em;color:var(--aux);border-bottom:2px solid transparent}
+.ai-tabs button.cur{color:var(--ink);border-bottom-color:var(--cinnabar)}
+.ai-pane{padding:18px;display:none;flex-direction:column;gap:12px;flex:1;overflow-y:auto}
+.ai-pane.cur{display:flex}
+.ai-scope{display:flex;gap:8px;align-items:center}
+.ai-scope select{flex:1}
+.ai-out{font-size:14px;line-height:1.9;color:var(--sub);white-space:pre-wrap}
+.ai-out h4{font-size:12px;font-family:var(--sans);letter-spacing:.2em;color:var(--aux);margin:14px 0 6px;font-weight:400}
+.ai-out .stat{font-family:var(--mono);font-size:11px;color:var(--aux)}
+.ai-out ol{padding-left:1.5em}
+.ai-out ol li{margin:.4em 0}
+.ref-item{border-left:2px solid var(--ochre);padding:6px 10px;margin-top:8px;font-size:12.5px;color:var(--body);background:rgba(212,160,23,.05);line-height:1.7}
+.ref-item b{display:block;font-family:var(--sans);font-size:11px;color:var(--aux);font-weight:400;margin-bottom:3px}
+.ai-hint{font-family:var(--sans);font-size:11.5px;color:var(--aux);line-height:1.9}
+.ai-hint a{cursor:pointer}
+#ai-q{flex:1}
+/* 选区弹层 */
+#sel-pop{position:fixed;z-index:40;background:var(--ink);color:var(--paper);display:flex;align-items:center;padding:7px 10px;gap:2px;box-shadow:0 2px 16px rgba(0,0,0,.25)}
+#sel-pop .sw{width:17px;height:17px;border-radius:50%;cursor:pointer;opacity:.9}
+#sel-pop .sw:hover{transform:scale(1.18)}
+#sel-pop .sw.c-cinnabar{background:#e8556f}.sw.c-indigo{background:#7d9bd4}#sel-pop .sw.c-indigo{background:#7d9bd4}#sel-pop .sw.c-ochre{background:#ecc25e}#sel-pop .sw.c-moss{background:#96b584}
+#sel-pop .u-btn{width:26px;height:17px;border-bottom:2.5px solid var(--paper);margin:0 4px;cursor:pointer}
+#sel-pop .n-btn,#sel-pop .s-btn{font-family:var(--sans);font-size:12px;color:var(--paper);padding:3px 8px;margin-left:4px;border-left:1px solid rgba(255,255,255,.25)}
+#sel-pop .n-btn:hover,#sel-pop .s-btn:hover{color:var(--night)}
+#sel-pop .s-btn{border-left:none}
+/* 弹窗 */
+.modal-mask{position:fixed;inset:0;background:rgba(26,26,26,.5);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--paper);border:1px solid var(--line);width:560px;max-width:100%;max-height:88vh;display:flex;flex-direction:column}
+.modal-head{padding:18px 22px 0;display:flex;align-items:baseline}
+.modal-head h3{font-size:17px;letter-spacing:.1em;flex:1}
+.modal-head .x{font-family:var(--mono);color:var(--aux);font-size:16px}
+.modal-body{padding:16px 22px 22px;overflow-y:auto}
+.modal-foot{padding:0 22px 22px;display:flex;gap:10px;justify-content:flex-end}
+.field{margin-bottom:14px}
+.field label{display:block;font-family:var(--sans);font-size:12px;color:var(--body);margin-bottom:6px;letter-spacing:.06em}
+.field input,.field select,.field textarea{width:100%}
+.field textarea{min-height:110px;resize:vertical;font-family:var(--serif);font-size:15px;line-height:1.8}
+.color-row{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.color-row .c{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+.color-row .c.sel{border-color:var(--ink);transform:scale(1.12)}
+.color-row .c.c-cinnabar{background:var(--cinnabar)}.color-row .c.c-indigo{background:var(--indigo)}.color-row .c.c-ochre{background:var(--ochre)}.color-row .c.c-moss{background:var(--moss)}
+.note-hint{font-family:var(--sans);font-size:11.5px;color:var(--aux);margin-top:10px;line-height:1.8}
+/* 检索 */
+#search-modal .modal{width:660px}
+#search-input{width:100%;font-size:16px;padding:11px 14px;font-family:var(--serif)}
+#search-results{margin-top:14px}
+.sr-group{margin-bottom:6px}
+.sr-book{font-family:var(--sans);font-size:12px;color:var(--aux);letter-spacing:.08em;padding:10px 2px 5px;border-bottom:1px solid var(--line)}
+.sr-item{padding:10px 6px;border-bottom:1px solid rgba(204,204,204,.45);cursor:pointer}
+.sr-item:hover{background:rgba(26,26,26,.03)}
+.sr-item .where{font-family:var(--sans);font-size:11.5px;color:var(--cinnabar);margin-bottom:3px}
+.sr-item .ctx{font-size:13.5px;color:var(--sub);line-height:1.8}
+.sr-item .ctx b{color:var(--ink);background:rgba(255,213,0,.45);font-weight:400;padding:0 1px}
+.sr-tabs{display:flex;gap:16px;margin:14px 0 4px;border-bottom:1px solid var(--line)}
+.sr-tabs button{font-size:13px;padding:7px 2px;color:var(--aux);border-bottom:2px solid transparent;letter-spacing:.08em}
+.sr-tabs button.cur{color:var(--ink);border-bottom-color:var(--cinnabar)}
+/* 批注总览 */
+.modal.wide{width:700px}
+#am-list{max-height:56vh;overflow-y:auto}
+.am-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.am-bar .grow{flex:1}
+.am-bar select{font-family:var(--sans);font-size:12px;padding:5px 9px;border:1px solid var(--line);background:var(--paper);color:var(--body);cursor:pointer;max-width:190px}
+.am-bar .chip{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.am-check{font-family:var(--sans);font-size:12px;color:var(--body);display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+/* 批注密度自检条 */
+.am-density{margin:2px 0 14px;padding:12px 14px 13px;background:rgba(26,26,26,.022);border-left:2px solid var(--ink)}
+.am-den-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-family:var(--sans);font-size:12px;color:var(--sub);margin-bottom:11px}
+.am-den-top b{font-family:var(--mono);font-size:19px;color:var(--ink);font-weight:400;letter-spacing:-.01em;line-height:1}
+.am-den-top .sep{color:var(--line)}
+.am-den-top .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;padding:2.5px 8px;background:var(--ink);color:var(--paper)}
+.am-den-top .tag.ok{background:#4a6b3d}
+.am-den-top .tag.lo{background:#8a8578}
+.am-den-top .tag.hi{background:var(--cinnabar)}
+.am-den-bar{position:relative;height:5px;background:rgba(26,26,26,.09);margin:0 0 6px}
+.am-den-zone{position:absolute;top:0;bottom:0;left:15%;width:45%;background:rgba(74,107,61,.28)}
+.am-den-cur{position:absolute;top:-4px;width:2px;height:13px;background:var(--cinnabar);transition:left .28s ease}
+.am-den-ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--aux);letter-spacing:.04em}
+.am-den-tip{font-family:var(--sans);font-size:12px;color:var(--body);line-height:1.85;margin-top:9px}
+.am-den-tip b{color:var(--ink);font-family:var(--mono);font-weight:400}
+.am-den-tip .link{border-bottom:1px solid var(--line);cursor:pointer;color:var(--ink)}
+.am-den-tip .link:hover{border-bottom-color:var(--cinnabar);color:var(--cinnabar)}
+.btn-mini{font-family:var(--sans);font-size:12px;padding:5px 10px;border:1px solid var(--line);background:none;color:var(--aux);cursor:pointer}
+.btn-mini:hover{color:var(--ink);border-color:var(--ink)}
+.am-group{font-family:var(--sans);font-size:12px;color:var(--aux);letter-spacing:.08em;margin:16px 0 6px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+.am-group:first-child{margin-top:4px}
+.am-item{display:flex;gap:11px;padding:11px 4px;border-bottom:1px solid rgba(204,204,204,.45);cursor:pointer}
+.am-item:hover{background:rgba(26,26,26,.025)}
+.am-item .body{flex:1;min-width:0}
+.am-item .where{font-family:var(--mono);font-size:10px;color:var(--aux);margin-bottom:5px;display:flex;gap:8px;align-items:center}
+.am-item .where .chip{width:8px;height:8px;border-radius:50%;flex:none}
+.am-item .where .chip.u{border-radius:0;height:2.5px;width:11px}
+.am-item .q{font-size:13px;color:var(--sub);line-height:1.75;border-left:2px solid var(--line);padding-left:10px}
+.am-item .n{font-size:13px;color:var(--ink);line-height:1.75;margin-top:7px;white-space:pre-wrap}
+.am-empty{padding:46px 20px;text-align:center;color:var(--aux);font-size:13px;font-family:var(--sans);line-height:2.1}
+.modal-foot .grow{flex:1}
+.am-sel{font-family:var(--mono);font-size:11px;color:var(--aux)}
+/* 排版弹层 */
+#typo-pop{position:fixed;top:60px;right:16px;z-index:30;background:var(--paper);border:1px solid var(--line);width:280px;padding:20px 22px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+#typo-pop h4{font-family:var(--sans);font-size:11px;letter-spacing:.24em;color:var(--aux);margin-bottom:10px}
+.typo-row{display:flex;align-items:center;gap:12px;margin:12px 0}
+.typo-row label{font-family:var(--sans);font-size:12px;color:var(--body);width:52px;flex:none}
+.typo-row input[type=range]{flex:1;accent-color:var(--ink)}
+.typo-row .val{font-family:var(--mono);font-size:11px;color:var(--ink);width:44px;text-align:right}
+.theme-row{display:flex;gap:8px;margin-top:14px}
+.theme-row .th{flex:1;height:44px;border:1px solid var(--line);cursor:pointer;position:relative}
+.theme-row .th.sel{border:2px solid var(--ink)}
+.theme-row .th span{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-family:var(--sans);font-size:10px;color:var(--aux)}
+.th-paper{background:#fafaf7}.th-ink{background:#1a1a1a}.th-dusk{background:#595959}.th-night{background:#221d12}
+/* 字体选择：用字体本身展示字体名 */
+.font-row{display:flex;gap:6px;flex:1}
+.font-row .ft{flex:1;height:32px;border:1px solid var(--line);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--body);transition:all .12s}
+.font-row .ft:hover{background:rgba(26,26,26,.03)}
+.font-row .ft.sel{border-color:var(--ink);color:var(--ink);background:rgba(26,26,26,.05)}
+.font-row .ft[data-font="serif"]{font-family:var(--serif)}
+.font-row .ft[data-font="sans"]{font-family:var(--sans)}
+.font-row .ft[data-font="mono"]{font-family:var(--mono)}
+/* Toast */
+#toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:13px;padding:10px 22px;z-index:99;opacity:0;transition:all .25s;pointer-events:none;letter-spacing:.05em;max-width:80vw}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* 移动端 */
+@media (max-width:720px){
+  #lib-bar{padding:0 14px}
+  .lib-wrap{padding:20px 16px 80px}
+  #text-view{padding:34px 18px 110px}
+  .drawer{width:100%;max-width:100%}
+  #typo-pop{right:8px;left:8px;width:auto}
+  .modal{width:100%}
+}
+</style>
+</head>
+<body data-page-node-id="ealT8OLTtig3syBwhvVQwN">
+
+<!-- ========== 书架视图 ========== -->
+<header id="lib-bar" data-page-node-id="b2jgcf9uEgXBHEDLmDFCOi">
+  <div class="brand" data-page-node-id="OC28p4mVxNhwCZyapAFSn2"><span class="dot" data-page-node-id="ewp9p47g0ZURzxReI13OIp"></span>墨砚<span class="en" data-page-node-id="BB3AnZJFPZTO5fjnjfBTvl">INKSTONE READER</span></div>
+  <div class="grow" data-page-node-id="Gp5BZeJaB7t2FCd05RFkdE"></div>
+  <button class="icon-btn" id="btn-import" data-page-node-id="A4v3ayjSmRAjHTWHLiAn6D">＋ 导入</button>
+  <button class="icon-btn" id="btn-anns" title="跨书浏览全部批注">批注</button>
+  <button class="icon-btn" id="btn-search-lib" data-page-node-id="dt1sIiK9EqaW3YrkGSbfCA">检索 ⌘F</button>
+  <button class="icon-btn" id="btn-settings" data-page-node-id="VH8UmCqEWWGSrU5ZqGGfq6">设置</button>
+  <input type="file" id="file-input" multiple accept=".pdf,.epub,.txt,.md,.markdown" hidden data-page-node-id="uhhXvSscxCxCLFmjxsGQ9C">
+</header>
+
+<section id="view-library" data-page-node-id="WAP85VZtZNEcTKIrHuFyZ4">
+  <div class="lib-wrap" data-page-node-id="JSCBxPPJGWqPAH6Ziav1tm">
+    <div id="lib-stats" class="lib-stats" data-page-node-id="xJO3ATz7ROkkW8aQq4AKyU"></div>
+    <div id="lib-tools" class="lib-tools" hidden>
+      <select id="lt-sort">
+        <option value="recent">最近阅读</option>
+        <option value="added">最近添加</option>
+        <option value="title">按书名</option>
+        <option value="progress">按进度</option>
+      </select>
+      <div class="lt-filters">
+        <button data-f="all" class="cur">全部</button>
+        <button data-f="pdf">PDF</button>
+        <button data-f="epub">EPUB</button>
+        <button data-f="text">文字</button>
+        <button data-f="reading">在读</button>
+        <button data-f="noted">有批注</button>
+      </div>
+      <span class="lt-count" id="lt-count"></span>
+    </div>
+    <div id="backup-hint" class="backup-hint" hidden data-page-node-id="bkH1nT7xQ2RmV4LdZs9Wyt"></div>
+    <div id="onboard" class="onboard" hidden data-page-node-id="vuzBDHv8peLXDRYcTpx5z4">
+      <h2 data-page-node-id="XPn6QFftaa8cr2WyoVZWAs">把第一本书放进墨砚</h2>
+      <p data-page-node-id="1u9czvqwreCE3gfw818AvX">支持 PDF / EPUB / TXT / Markdown 四种格式，本地导入、本地存储。<br data-page-node-id="GojDjcmbsPS4k2MMlkP8Go">极简净空阅读 · 四色批注 · 全文检索 · 本地摘要与问答。</p>
+      <button class="btn" id="btn-import-2" data-page-node-id="FXCLzxfcFKZ7de3Rke0O1B">从文件导入</button>
+      <div class="k" data-page-node-id="QrwjfPvfAVgVsEspjFCwER">DRAG &amp; DROP · 拖拽文件到本页亦可</div>
+    </div>
+    <div id="book-grid" data-page-node-id="Iy6Do8cpmYCUPlnUQ6yrX0"></div>
+  </div>
+</section>
+
+<!-- ========== 阅读视图 ========== -->
+<section id="view-reader" hidden data-page-node-id="03v0Sc8XH0zpnxIhatlXR6">
+  <header id="reader-bar" data-page-node-id="aACZKy29aTesOAniLjq5du">
+    <button class="icon-btn" id="btn-back" data-page-node-id="mvqlNufsUacerlg2IVaWuW">← 书架</button>
+    <div id="rb-title" data-page-node-id="GtksbXB4D2bp9VfoUCulDs"></div>
+    <span id="rb-chapter" data-page-node-id="t4CVaR5SdcV5hR0FNqmTfW"></span>
+    <button class="icon-btn" id="btn-toc" data-page-node-id="SKHQVEjYZM7D22g0C5GamE">目录</button>
+    <button class="icon-btn" id="btn-annot" data-page-node-id="kTj6rbJXy9eaMR4jaYiIQ7">批注</button>
+    <button class="icon-btn" id="btn-ai" data-page-node-id="xJvSng9HoAnWsoY4qxpcoz">AI</button>
+    <button class="icon-btn" id="btn-speak" data-page-node-id="mJGjP9ZUoApMfCfuejQz20">朗读</button>
+    <button class="icon-btn" id="btn-typo" data-page-node-id="XhQgxXsSzjpCxWg5VGopAz">Aa</button>
+    <button class="icon-btn" id="btn-export" data-page-node-id="422cY67BVUeru6vVuRSvgn">导出</button>
+  </header>
+  <div id="reader-stage" data-page-node-id="ymCSsMmS69GXCKAlJ3iHRw">
+    <div id="text-view" data-theme="paper" data-page-node-id="HVVJnlHBIhPTTHry25UIcE">
+      <article id="reader-content" data-page-node-id="hSkGrbCc2ImzJwF6LB7iLQ"></article>
+    </div>
+    <div id="pdf-view" hidden data-page-node-id="WUnctKavdme7WXqTgWIQgl">
+      <div id="pdf-canvas-wrap" data-page-node-id="C1xP6XW2gVkaANT4FI3ZtF"><canvas id="pdf-canvas" data-page-node-id="PxlidnJu4Zse0w3xd2fchH"></canvas><div id="pdf-text-layer" data-page-node-id="tLx7Qm3VdRkPdfTextLayer01"></div></div>
+      <div id="pdf-nav" data-page-node-id="A0yAPsmyAeMGn2G1HwVUOu">
+        <button id="pdf-prev" data-page-node-id="YiwQ5quWC0sqTYR2dJ8EPE">◀</button>
+        <span id="pdf-page-label" data-page-node-id="6rqBpxUYbvFeW5FJH1kAuL"></span>
+        <button id="pdf-next" data-page-node-id="kCcWXmVCMRdP0C8xWcohIF">▶</button>
+        <div id="pdf-zoom" data-page-node-id="YETFCtQ7Tq595DBgJfhupE">
+          <button id="pdf-zoom-out" data-page-node-id="W7A5dVqOzjnMvTlEj6LmRQ">－</button>
+          <button id="pdf-zoom-in" data-page-node-id="SFLEb5yH7jtvGsDjtCAuTD">＋</button>
+        </div>
+        <button id="pdf-note-btn" style="font-family:var(--sans);font-size:12px" data-page-node-id="t9D7KR50xEYV021v8fZn8U">本页批注</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 目录抽屉 -->
+  <aside id="toc-drawer" class="drawer" data-page-node-id="yKREhl4GbrlWMmx0rqiHVW">
+    <div class="panel-head" data-page-node-id="gh2P51RGdLCLvH5pLYD4YB">目录<span class="grow" data-page-node-id="BFOxbWtEK8tjgOFHdMKwmE"></span><button class="x" data-close="toc-drawer" data-page-node-id="ibQttNRpLc0sXO4eBRBlBP">×</button></div>
+    <div class="panel-body" id="toc-list" data-page-node-id="AOTJsDGbXaaRbyAwfN3HsL"></div>
+  </aside>
+  <!-- 批注侧栏 -->
+  <aside id="annot-panel" class="drawer" data-page-node-id="lN1qqHFS0Rh7BzEKsxVLh5">
+    <div class="panel-head" data-page-node-id="MhkUpWFDUGbPq8L1VGxCgX">批注 · <span id="ann-count" style="font-family:var(--mono);font-size:12px" data-page-node-id="rItcvgk70HzD1Rgtqo4WAF"></span><span class="grow" data-page-node-id="Dz5293G6GqMbzgm4efr8B7"></span><button class="x" data-close="annot-panel" data-page-node-id="fjqZWwIBeufxDA6TJZrJl2">×</button></div>
+    <div class="panel-body" id="ann-list" data-page-node-id="IQNOmHy1JjHVPEK5I4H5v6"></div>
+  </aside>
+  <!-- AI 面板 -->
+  <aside id="ai-panel" class="drawer" data-page-node-id="g48Oo0kyQoZwohprIjYYfo">
+    <div class="panel-head" data-page-node-id="JDusdsRciHd80iHG87Qouo">AI 阅读辅助<span class="grow" data-page-node-id="L4ylDBBUiqBUBsJHwiDGs3"></span><button class="x" data-close="ai-panel" data-page-node-id="p9q73m59I8AwIHDIilKRfJ">×</button></div>
+    <div class="ai-tabs" data-page-node-id="4gvPVZaDkO4I7GMdlEstMC">
+      <button data-tab="sum" class="cur" data-page-node-id="k0M5cSjFACYlhENTBxNSDr">摘 要</button>
+      <button data-tab="qa" data-page-node-id="qsmihROsuPmSTfAUKnH9sS">问 答</button>
+    </div>
+    <div id="ai-pane-sum" class="ai-pane cur" data-page-node-id="x0InqGwaeZUoJ1fJfEDRtM">
+      <div class="ai-scope" data-page-node-id="ESAlcTF9PH8vVdJVModO5p">
+        <select id="ai-sum-scope" data-page-node-id="i7xVygLsUJ5uaomw8aY6mu">
+          <option value="chapter" data-page-node-id="Mzfnue0PffqHBgrylAPXHy">当前章节</option>
+          <option value="book" data-page-node-id="XghVsVThvmmAJLpOxMlJW0">全书</option>
+        </select>
+        <button class="btn small" id="ai-sum-btn" data-page-node-id="LNwIh8nRPAlFhjGS9lDTwc">生成</button>
+      </div>
+      <div class="ai-hint" id="ai-sum-hint" data-page-node-id="l165KHlmw8LNxIOyADuP0f">本地抽取式摘要，无需联网。可在「设置」中接入 LLM 获得生成式摘要。</div>
+      <div class="ai-out" id="ai-sum-out" data-page-node-id="4her53G3z5jYCYhjdt9aGO"></div>
+    </div>
+    <div id="ai-pane-qa" class="ai-pane" data-page-node-id="f6QlT6vsfeEFqXba14PI4a">
+      <div style="display:flex;gap:8px" data-page-node-id="68DwB9DQGxL5awPCHkzsca">
+        <input id="ai-q" placeholder="就这本书提问…" data-page-node-id="QcWr8OLqHCExxBzIPIFoRy">
+        <button class="btn small" id="ai-qa-btn" data-page-node-id="IbOM8szPpMC3c7JSOBLvii">问</button>
+      </div>
+      <div class="ai-scope" data-page-node-id="SmGuNgLh5tbMVnHJDuB7Of">
+        <select id="ai-qa-scope" data-page-node-id="zOBm9Jd7mbPE8mfzbK3z4h">
+          <option value="book" data-page-node-id="NZ9zIc2qETcO3Atc8byBFH">当前书</option>
+          <option value="all" data-page-node-id="HWp0iK5l57hLuWFGfMmQ6n">全部书库</option>
+        </select>
+      </div>
+      <div class="ai-hint" id="ai-qa-hint" data-page-node-id="mRpbjoJfdhyvoEtOw2SEmy">本地检索最相关原文段落作答；接入 LLM 后由模型生成答案。</div>
+      <div class="ai-out" id="ai-qa-out" data-page-node-id="0YRUuF4GxHr9EODCjTCHzH"></div>
+    </div>
+  </aside>
+  <!-- 排版弹层 -->
+  <div id="typo-pop" hidden data-page-node-id="E0hHZgoS0fVTbSgXbGwOa8">
+    <h4 data-page-node-id="sTQ96X2p6BClcmA5TVWZIO">排版 TYPOGRAPHY</h4>
+    <div class="typo-row" data-page-node-id="QnvH9FMpv35aZPop7V6S1l"><label data-page-node-id="oOIQm9iWdKj10tRbkaTfdU">字号</label><input type="range" id="t-fs" min="14" max="26" step="1" data-page-node-id="hW5Ltu08jGNNlT8YWzwLej"><span class="val" id="t-fs-v" data-page-node-id="W7CIVHLiBeoPGBoSUnexaX"></span></div>
+    <div class="typo-row" data-page-node-id="ZICZtrM8KntI84iVt4CACG"><label data-page-node-id="XdmRIezZy7EMIJZHVT4DKM">行距</label><input type="range" id="t-lh" min="0" max="4" step="1" data-page-node-id="8z26yIO4uMzoIKFG8P9Xk2"><span class="val" id="t-lh-v" data-page-node-id="9txFv9TXaglIIYYCOE1dtk"></span></div>
+    <div class="typo-row" data-page-node-id="0TIhAc61jEiaBraEw8HZjs"><label data-page-node-id="UXuOJQwsDrox8duXz7ZSsr">段距</label><input type="range" id="t-para" min="0" max="2" step="1" data-page-node-id="xNmvRQk0DBWXShK56utkFU"><span class="val" id="t-para-v" data-page-node-id="SXCpvxSjTnBr0Tu9DzJrEc"></span></div>
+    <div class="typo-row" data-page-node-id="Ft7R0w1KbNq2XzVd5pJhAe"><label data-page-node-id="Kd3mYpQr8ZnV6tBc1WsXjL">字体</label>
+      <div class="font-row" data-page-node-id="Nb5vTg2HmRk9LpQx3YwZcF">
+        <div class="ft" data-font="serif" data-page-node-id="Qa1zXsW4nJm7KvRt6YhBdE"><span data-page-node-id="Zx8cVb3NmQw5LkJh2TfRgY">宋体</span></div>
+        <div class="ft" data-font="sans" data-page-node-id="Rt4yNb7KpLm2ZxCv9WqJdA"><span data-page-node-id="Hm6vTg3XsRk8NwQz5JhBcF">黑体</span></div>
+        <div class="ft" data-font="mono" data-page-node-id="Wq9mKp2XtRv7YzNc4LhJdG"><span data-page-node-id="Ty5nVb8QsMk3XwRz6JcBgH">等宽</span></div>
+      </div>
+    </div>
+    <div class="theme-row" data-page-node-id="kMtDOOwbQE3i3SR8Ld9be8">
+      <div class="th th-paper" data-th="paper" data-page-node-id="FTV8OYj57Ay25iED4olAYc"><span data-page-node-id="zjRfXfxa34ABg5MsketDKI">纸白</span></div>
+      <div class="th th-ink" data-th="ink" data-page-node-id="JLmD7k1xL4g2br6bDWjImH"><span data-page-node-id="QGV7TBXzkrKirHReItPPqT">墨黑</span></div>
+      <div class="th th-dusk" data-th="dusk" data-page-node-id="WEleOmuf2Kijro4B7DNka9"><span data-page-node-id="EMqkpHMl8Zj7mktbcOlk7o">暮灰</span></div>
+      <div class="th th-night" data-th="night" data-page-node-id="Q5gp08Xv0DvL2q0um54rJq"><span data-page-node-id="rjqgQUgG4os7NzZNYdDFC4">夜黄</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 选区弹层 -->
+<div id="sel-pop" hidden data-page-node-id="sIP7uuvhzA6Apl1iriPxMI">
+  <span class="sw c-cinnabar" data-color="cinnabar" title="朱砂" data-page-node-id="SHv4oXgnFgKnbBdapkM8Lo"></span>
+  <span class="sw c-indigo" data-color="indigo" title="黛蓝" data-page-node-id="I1Y1q9nMziP8Zaz3DoQJrg"></span>
+  <span class="sw c-ochre" data-color="ochre" title="藤黄" data-page-node-id="Q3sDcBcdttpBRrV0NSEFYC"></span>
+  <span class="sw c-moss" data-color="moss" title="苔绿" data-page-node-id="yXDgl5z9k4vW5QAjs627mw"></span>
+  <span class="u-btn" data-type="underline" title="下划线" data-page-node-id="sCbzMNjHNuqmG4msXDUKmn"></span>
+  <button class="n-btn" data-type="note" data-page-node-id="4CS9OcH82OcYBhXaFfdRvu">批注…</button>
+  <button class="s-btn" data-type="search" data-page-node-id="qK3vN8xTZLpSelSearchBtn1">检索</button>
+</div>
+
+<!-- 批注弹窗 -->
+<div class="modal-mask" id="note-modal" hidden data-page-node-id="DZmm8zAw0h9PIhRiN3GnDw">
+  <div class="modal" data-page-node-id="mxDnGKLjVzHS0Y1vUBoQH1">
+    <div class="modal-head" data-page-node-id="djWsMolXUkaQHbTcRA5bET"><h3 data-page-node-id="eN4QHk84xslLJbgyOn98qx">批注</h3><button class="x" data-close-modal="note-modal" data-page-node-id="qjpiXLGawehvG89AuXnNLI">×</button></div>
+    <div class="modal-body" data-page-node-id="hwGGdW8VzrcDZKtDWqUQd5">
+      <div class="color-row" id="note-colors" data-page-node-id="lt0gT7FS8EVzu59885S4Zj">
+        <span class="c c-cinnabar sel" data-color="cinnabar" title="朱砂" data-page-node-id="wUHlLsdwF8LbEs8aZ8Fb9q"></span>
+        <span class="c c-indigo" data-color="indigo" title="黛蓝" data-page-node-id="WLIZ1VCmpTJsTkk9Svhwb6"></span>
+        <span class="c c-ochre" data-color="ochre" title="藤黄" data-page-node-id="akkOh0YaeSMTAXtcEzSHGc"></span>
+        <span class="c c-moss" data-color="moss" title="苔绿" data-page-node-id="XE2temk2XkDz6fMgYgQ7Rg"></span>
+      </div>
+      <div class="field" data-page-node-id="agc9LsNy96nEXJXwKu7a9i">
+        <label data-page-node-id="oiwaduLMDCbDoURVoEoWuy">选中原文</label>
+        <div id="note-quote" style="font-size:13.5px;color:var(--body);border-left:2px solid var(--line);padding-left:10px;line-height:1.8;max-height:110px;overflow-y:auto" data-page-node-id="OYT2h18FGQSbm1q3D5dgpE"></div>
+      </div>
+      <div class="field" data-page-node-id="oD9Gi5H5QbXaYe16wMGIrE">
+        <label data-page-node-id="7S69WjbTffG4KlKmVluBdJ">你的想法</label>
+        <textarea id="note-text" placeholder="写下此刻的想法…"></textarea>
+      </div>
+      <div class="note-hint" data-page-node-id="ozGgchFdFaihSP2ozJrbrH">批注自动保存于本机，并纳入全文检索。</div>
+    </div>
+    <div class="modal-foot" data-page-node-id="KWTjvSn00wruhOwR8Zeflp">
+      <button class="btn ghost" id="note-del" hidden data-page-node-id="9r2vEHcu3OZmSVd88eDRqy">删除批注</button>
+      <button class="btn ghost" data-close-modal="note-modal" data-page-node-id="YPGKsDyVERTGmiHam4EJSu">取消</button>
+      <button class="btn" id="note-save" data-page-node-id="1iLftF8p29Dvwb8HsfEqNW">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 检索弹窗 -->
+<div class="modal-mask" id="search-modal" hidden data-page-node-id="2LNxlS8GdYfD8BW1GSMD9S">
+  <div class="modal" data-page-node-id="Lv9kuxZcFsqIAKq51mU4OW">
+    <div class="modal-head" data-page-node-id="JAfzFVB54x80lHhOMgHC9Z"><h3 data-page-node-id="YqmtsR0OYaxE4oI2CAY1xP">检索</h3><button class="x" data-close-modal="search-modal" data-page-node-id="C2PFJTxnSssdbpFFdisJ0h">×</button></div>
+    <div class="modal-body" data-page-node-id="RMxqXNg3TB0SETo9XU6KVa">
+      <input id="search-input" placeholder="书内全文 · 跨书 · 批注　回车检索" data-page-node-id="7IYkrSusmjqwNhvMOwwZr2">
+      <div class="sr-tabs" data-page-node-id="Bk5xBdEUU4EPe9V2AXNX8N">
+        <button data-st="text" class="cur" data-page-node-id="8nSWpB1gJdDql7LoA8FGcB">全文</button>
+        <button data-st="ann" data-page-node-id="qIUffQ1gQ6VGzIidxET9kb">批注</button>
+      </div>
+      <div id="search-results" data-page-node-id="NBMtW3KUM8vowr6FAA6boL"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 批注总览弹窗 -->
+<div class="modal-mask" id="anns-modal" hidden>
+  <div class="modal wide">
+    <div class="modal-head"><h3>批注总览 · <span id="am-count" style="font-family:var(--mono);font-size:12px"></span></h3><button class="x" data-close-modal="anns-modal">×</button></div>
+    <div class="modal-body">
+      <div id="am-density" class="am-density" hidden></div>
+      <div class="am-bar">
+        <select id="am-book"></select>
+        <div class="lt-filters" id="am-colors">
+          <button data-c="" class="cur">全部</button>
+          <button data-c="cinnabar"><i class="chip c-cinnabar"></i>朱砂</button>
+          <button data-c="indigo"><i class="chip c-indigo"></i>黛蓝</button>
+          <button data-c="ochre"><i class="chip c-ochre"></i>藤黄</button>
+          <button data-c="moss"><i class="chip c-moss"></i>苔绿</button>
+        </div>
+        <select id="am-note">
+          <option value="">全部批注</option>
+          <option value="yes">仅写了想法的</option>
+          <option value="no">仅没写想法的</option>
+        </select>
+        <span class="grow"></span>
+        <button class="btn-mini" id="am-all">全选</button>
+        <button class="btn-mini" id="am-none">清空</button>
+      </div>
+      <div id="am-list"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="am-sel" id="am-sel"></span><span class="grow"></span>
+      <button class="btn ghost" data-close-modal="anns-modal">关闭</button>
+      <button class="btn" id="am-export">导出所选 Markdown</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导出弹窗 -->
+<div class="modal-mask" id="export-modal" hidden data-page-node-id="Ex7pQr2mVn5KtLw9BdYcZs">
+  <div class="modal" data-page-node-id="Rt3mNq8XvKp2YzWc6JhBgF">
+    <div class="modal-head" data-page-node-id="Wq5vTb9NkRp3XmQz7LdJcH"><h3 data-page-node-id="Zx2cVb6NmQw8KvRt4YhBdE">导出</h3><button class="x" data-close-modal="export-modal" data-page-node-id="Hm7nTg4XsRk2NwQz9JcBvG">×</button></div>
+    <div class="modal-body" data-page-node-id="Ty8mKp3XtRv6ZzNc5LhJdK">
+      <div class="field" data-page-node-id="Nb4vTg7HmRk2LpQx8YwZcM"><label data-page-node-id="Qa3zXsW6nJm9KvRt2YhBdN">导出格式</label>
+        <select id="exp-target" data-page-node-id="Rt6yNb9KpLm4ZxCv1WqJdP">
+          <option value="obsidian">Obsidian 笔记包（反向链接 · ZIP）</option>
+          <option value="md">Markdown 单文件（批注 + 原文）</option>
+        </select>
+      </div>
+      <div id="obs-opts" data-page-node-id="Wq2mKp5XtRv9YzNc7LhJdQ">
+        <div class="field" data-page-node-id="Ty4nVb7QsMk5XwRz3JcBgR"><label data-page-node-id="Zx6cVb9NmQw1KvRt8YhBdT">导出范围</label>
+          <select id="obs-scope" data-page-node-id="Hm8nTg1XsRk7NwQz4JcBvW">
+            <option value="all">全部（章节 + 原文 + 批注）</option>
+            <option value="highlight">仅标注处（跳过无批注章节，不含原文）</option>
+            <option value="note">仅文字批注（排除纯高亮）</option>
+          </select>
+        </div>
+        <div class="field" data-page-node-id="Qa5zXsW2nJm3KvRt6YhBdY"><label data-page-node-id="Rt8yNb3KpLm6ZxCv9WqJdZ"><input type="checkbox" id="obs-yaml" checked style="width:auto" data-page-node-id="Zx4cVb5NmQw7KvRt1YhBdV"> 带 YAML Front Matter（Obsidian 属性面板可识别）</label></div>
+        <div class="note-hint" data-page-node-id="Nb2vTg9HmRk4LpQx5YwZcR">生成结构：<code style="font-family:var(--mono);font-size:11px">《书名》.md</code>（主笔记，块引用聚合全部批注）+ <code style="font-family:var(--mono);font-size:11px">《书名》/每章.md</code>（各自带 <code style="font-family:var(--mono);font-size:11px">^ink-xxx</code> 块 ID）。解压后整个文件夹拖进 Obsidian vault 即可自动建立双向链接图谱。</div>
+      </div>
+    </div>
+    <div class="modal-foot" data-page-node-id="Ty6mKp7XtRv1ZzNc8LhJdW">
+      <button class="btn ghost" data-close-modal="export-modal" data-page-node-id="Zx8cVb2NmQw3KvRt5YhBdZ">取消</button>
+      <button class="btn" id="exp-go" data-page-node-id="Hm1nTg5XsRk9NwQz2JcBvY">导出</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设置弹窗 -->
+<div class="modal-mask" id="settings-modal" hidden data-page-node-id="dZLHNAYVtz4jxpohlLuYRi">
+  <div class="modal" data-page-node-id="Q8Cp1CZvoKgTRG7dGDoVdG">
+    <div class="modal-head" data-page-node-id="E29LBCzSE7vEqa9z0vsEJw"><h3 data-page-node-id="5hmi2QXzYQVc1yoZzPmSZL">设置</h3><button class="x" data-close-modal="settings-modal" data-page-node-id="j10wMTQ2H0fqZyfByYD1bv">×</button></div>
+    <div class="modal-body" data-page-node-id="15PHntV0oy60qaH7cOYRAO">
+      <div class="field" data-page-node-id="UFT6CedYAYhHEPbbMIhCNq">
+        <label data-page-node-id="ByFE7mGNGFpOEw3BKsgnXE">LLM 接入（可选 · OpenAI 兼容接口，用于生成式摘要与问答）</label>
+        <input id="llm-baseurl" placeholder="https://api.openai.com/v1" data-page-node-id="DprsQzSYYdqNBTDQapQVPt">
+      </div>
+      <div class="field" data-page-node-id="L4HQDylnD1BzVww8GdWHhE"><label data-page-node-id="CVD0tdBc1ZJe6Atw9xEOcG">API Key</label><input id="llm-key" type="password" placeholder="sk-…" data-page-node-id="LOiFnhLVbWc4h5aZA2Cdoa"></div>
+      <div class="field" data-page-node-id="xWsvgZIO3dKeDeGh7X20RK"><label data-page-node-id="c6JlwrainzNWAMkAUzDaYe">模型名</label><input id="llm-model" placeholder="例如 gpt-4o-mini / deepseek-chat" data-page-node-id="z6QnOjSBDJe4xCoi1Kbwsn"></div>
+      <div class="field" data-page-node-id="DyznbMi7DOiirftxyTSbf1"><label data-page-node-id="10PXkTWnFPG5bYmbMIUQOg"><input type="checkbox" id="llm-enabled" style="width:auto" data-page-node-id="o6hq2mwrckJOVxm4znoCBh"> 启用 LLM（未启用时使用本地算法，完全离线）</label></div>
+      <div class="note-hint" data-page-node-id="QhunFNP87Z5pMtwz7fGS7t">密钥仅保存在本机浏览器 localStorage，不经过任何第三方服务器。</div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:20px 0" data-page-node-id="LaqIA6DBNRkD8XXddfbaim">
+      <div class="field" data-page-node-id="gjUNvPSwlbn602E5LnAfwj"><label data-page-node-id="VMp5RaO7SalxI5VbshXzti">数据保全（批注只存在本机浏览器，请定期备份）</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          <button class="btn small ghost" id="btn-backup-light">导出批注备份</button>
+          <button class="btn small ghost" id="btn-backup-full">导出完整备份</button>
+          <button class="btn small ghost" id="btn-restore">从备份恢复</button>
+        </div>
+        <input type="file" id="backup-input" accept="application/json,.json" hidden>
+        <div class="note-hint" style="margin-top:8px">批注备份＝书名 + 全部批注（体积小，救回核心资产）；完整备份＝另含正文与原文件（可 100% 还原，体积大）。恢复按 ID 去重，不会覆盖现有阅读进度。</div>
+      </div>
+      <div class="field" data-page-node-id="gjUNvPSwlbn602E5LnAfwj2"><label data-page-node-id="VMp5RaO7SalxI5VbshXzti2">危险操作</label>
+        <button class="btn small ghost" id="btn-clear-all" data-page-node-id="DZpDtV9GKkQoYfAFV9BF7A" style="border-color:#c8102e;color:#c8102e">清空书架与批注</button>
+      </div>
+    </div>
+    <div class="modal-foot" data-page-node-id="t0KubnK9ArXHuXkAvPYQyu">
+      <button class="btn" id="settings-save" data-page-node-id="9DSMQBbuXvTLB44cGO3pcW">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" data-page-node-id="iy9NCkKcCC8ZEFb3lNNrt9"></div>
+
+<script>
+'use strict';
+/* ================= M1 · 基础工具 ================= */
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const weekKeyOf = ts => Math.floor(ts / (7 * 864e5));
+const fmtMin = ms => { const m = Math.round(ms / 60000); return m < 60 ? m + ' 分钟' : Math.floor(m / 60) + ' 小时 ' + (m % 60) + ' 分'; };
+let _toastT;
+function toast(msg, ms = 2200) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastT); _toastT = setTimeout(() => t.classList.remove('show'), ms);
+}
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if ($(`script[data-l="${src}"]`)) return res();
+    const s = document.createElement('script');
+    s.src = src; s.dataset.l = src;
+    s.onload = res; s.onerror = () => rej(new Error('脚本加载失败，请检查网络：' + src));
+    document.head.appendChild(s);
+  });
+}
+const CDN = {
+  jszip: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+  pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  pdfjsWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+};
+const HL_NAMES = { cinnabar: '朱砂', indigo: '黛蓝', ochre: '藤黄', moss: '苔绿' };
+/* 全局状态 */
+const S = { books: [], allAnns: [], current: null, chapter: 0, pdfDoc: null, pdfPage: 1, pdfZoom: 1, readingMs: 0, saving: false };
+
+/* ================= M2 · 存储层 ================= */
+let _db = null;
+function idb() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('inkstone', 1);
+    r.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('books')) db.createObjectStore('books', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('anns')) { const st = db.createObjectStore('anns', { keyPath: 'id' }); st.createIndex('bookId', 'bookId'); }
+    };
+    r.onsuccess = () => { _db = r.result; res(_db); };
+    r.onerror = () => rej(r.error);
+  });
+}
+async function dbPut(store, val) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+async function dbGetAll(store) { const db = await idb(); return new Promise((res, rej) => { const rq = db.transaction(store).objectStore(store).getAll(); rq.onsuccess = () => res(rq.result || []); rq.onerror = () => rej(rq.error); }); }
+async function dbDelete(store, id) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).delete(id); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+async function dbClear(store) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).clear(); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+/* localStorage 偏好 */
+function getPrefs() { try { return JSON.parse(localStorage.getItem('inkstone.prefs')) || {}; } catch (e) { return {}; } }
+function setPrefs(patch) { const p = { ...getPrefs(), ...patch }; localStorage.setItem('inkstone.prefs', JSON.stringify(p)); return p; }
+function getLLM() { try { return JSON.parse(localStorage.getItem('inkstone.llm')) || { enabled: false, baseURL: '', apiKey: '', model: '' }; } catch (e) { return { enabled: false, baseURL: '', apiKey: '', model: '' }; } }
+const LH_LEVELS = [1.6, 1.8, 2.0, 2.2, 2.5];
+const PARA_LEVELS = ['0.6em', '1em', '1.5em'];
+
+/* ================= M3 · 文档解析 ================= */
+async function readFileText(file) {
+  const buf = await file.arrayBuffer();
+  let t = new TextDecoder('utf-8').decode(buf);
+  const bad = (t.match(/\uFFFD/g) || []).length;
+  if (bad > Math.max(10, t.length * 0.002)) { try { t = new TextDecoder('gbk').decode(buf); } catch (e) {} }
+  return t;
+}
+function chapterizeTxt(text) {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const re = /^\s*(第[零一二三四五六七八九十百千万0-9]+[章节卷部篇][^：:]{0,24}|序章|楔子|序言|前言|后记|尾声|Chapter\s+\d+.{0,30})\s*$/i;
+  const chapters = []; let cur = { title: '开头', blocks: [] }; let buf = [];
+  const flush = () => { const t = buf.join(' ').replace(/\s+/g, ' ').trim(); if (t) cur.blocks.push({ type: 'p', text: t }); buf = []; };
+  for (const ln of lines) {
+    const m = ln.match(re);
+    if (m && ln.trim().length <= 32) {
+      flush();
+      if (cur.blocks.length || cur.title !== '开头') chapters.push(cur);
+      cur = { title: m[1].trim(), blocks: [] };
+    } else if (ln.trim() === '') flush();
+    else buf.push(ln.trim());
+  }
+  flush(); if (cur.blocks.length) chapters.push(cur);
+  return chapters.length ? chapters : [{ title: '全文', blocks: [] }];
+}
+function mdToBlocks(src) {
+  const lines = src.replace(/\r\n?/g, '\n').split('\n');
+  const blocks = []; let i = 0;
+  while (i < lines.length) {
+    const L = lines[i];
+    if (/^```/.test(L)) { const buf = []; i++; while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; } i++; if (buf.length) blocks.push({ type: 'code', text: buf.join('\n') }); continue; }
+    const h = L.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { blocks.push({ type: 'h' + h[1].length, text: h[2].trim() }); i++; continue; }
+    if (/^\s*[-*+]\s+/.test(L)) { const items = []; while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-*+]\s+/, '')); i++; } blocks.push({ type: 'ul', items }); continue; }
+    if (/^\s*\d+[.、]\s+/.test(L)) { const items = []; while (i < lines.length && /^\s*\d+[.、]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+[.、]\s+/, '')); i++; } blocks.push({ type: 'ol', items }); continue; }
+    if (/^>\s?/.test(L)) { const buf = []; while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^>\s?/, '')); i++; } blocks.push({ type: 'quote', text: buf.join(' ') }); continue; }
+    if (/^(---+|\*\*\*+|___+)\s*$/.test(L)) { blocks.push({ type: 'hr' }); i++; continue; }
+    if (L.trim() === '') { i++; continue; }
+    const buf = [L]; i++;
+    while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6}\s|```|>|\s*[-*+]\s|\s*\d+[.、]\s|---)/.test(lines[i])) { buf.push(lines[i]); i++; }
+    blocks.push({ type: 'p', text: buf.join(' ') });
+  }
+  return blocks;
+}
+function chapterizeMd(text) {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const chapters = []; let cur = { title: '正文', lines: [] };
+  for (const ln of lines) {
+    const m = ln.match(/^#\s+(.+)$/);
+    if (m) { if (cur.lines.some(l => l.trim())) chapters.push(cur); cur = { title: m[1].trim(), lines: [] }; }
+    else cur.lines.push(ln);
+  }
+  if (cur.lines.some(l => l.trim()) || !chapters.length) chapters.push(cur);
+  return chapters.map(c => ({ title: c.title, blocks: mdToBlocks(c.lines.join('\n')) }));
+}
+function inlineMd(s) {
+  let t = esc(s);
+  t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+  t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return t;
+}
+function renderBlocks(blocks) {
+  return blocks.map(b => {
+    switch (b.type) {
+      case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6':
+        return `<${b.type}>${inlineMd(b.text)}</${b.type}>`;
+      case 'p': return `<p>${inlineMd(b.text)}</p>`;
+      case 'quote': return `<blockquote><p>${inlineMd(b.text)}</p></blockquote>`;
+      case 'code': return `<pre><code>${esc(b.text)}</code></pre>`;
+      case 'ul': return `<ul>${b.items.map(i => `<li>${inlineMd(i)}</li>`).join('')}</ul>`;
+      case 'ol': return `<ol>${b.items.map(i => `<li>${inlineMd(i)}</li>`).join('')}</ol>`;
+      case 'hr': return `<hr>`;
+    }
+    return '';
+  }).join('');
+}
+function chapterText(ch) {
+  return ch.blocks.map(bl => (bl.type === 'ul' || bl.type === 'ol') ? (bl.items || []).join('\n') : (bl.text || '')).join('\n');
+}
+/* --- EPUB --- */
+function resolveZipPath(dir, href) {
+  let p = href.replace(/^#.*$/, '');
+  if (p.startsWith('/')) return p.slice(1);
+  p = dir + p;
+  return p.replace(/^\.\//, '').replace(/\/\.\//g, '/');
+}
+function zipFind(zip, path) {
+  if (!path) return null;
+  const cands = [path, decodeURIComponent(path), encodeURI(path)];
+  for (const c of cands) { const f = zip.file(c); if (f) return f; }
+  // 兜底：按文件名匹配
+  const base = path.split('/').pop();
+  let hit = null;
+  zip.forEach((rel, f) => { if (!hit && !f.dir && rel.split('/').pop() === base) hit = f; });
+  return hit;
+}
+async function zipText(zip, path) { const f = zipFind(zip, path); return f ? await f.async('string') : null; }
+function textOfXml(doc, tag) {
+  let el = doc.getElementsByTagName(tag)[0];
+  if (!el) { // 命名空间前缀（如 dc:title）
+    el = [...doc.getElementsByTagName('*')].find(e => e.localName === tag);
+  }
+  return el ? (el.textContent || '').trim() : '';
+}
+async function buildEpubToc(zip, opfDoc, opfDir, manifest) {
+  const map = new Map();
+  try {
+    const spineEl = opfDoc.querySelector('spine');
+    const ncxId = spineEl ? spineEl.getAttribute('toc') : null;
+    // 优先 nav 文档（EPUB3）
+    const navItem = Object.values(manifest).find(m => /\bnav\b/.test(m.props));
+    if (navItem) {
+      const html = await zipText(zip, resolveZipPath(opfDir, navItem.href));
+      if (html) {
+        const navDir = resolveZipPath(opfDir, navItem.href).split('/').slice(0, -1).join('/');
+        const nd = new DOMParser().parseFromString(html, 'text/html');
+        [...nd.querySelectorAll('nav a[href]')].forEach(a => {
+          const t = (a.textContent || '').trim();
+          const href = a.getAttribute('href') || '';
+          if (t && href && !href.startsWith('http')) {
+            map.set(resolveZipPath(navDir ? navDir + '/' : '', href.split('#')[0]), t);
+          }
+        });
+      }
+    }
+    // NCX 兜底（EPUB2）
+    if (ncxId && manifest[ncxId] && map.size === 0) {
+      const ncx = await zipText(zip, resolveZipPath(opfDir, manifest[ncxId].href));
+      if (ncx) {
+        const nd = new DOMParser().parseFromString(ncx, 'application/xml');
+        [...nd.getElementsByTagName('navPoint')].forEach(np => {
+          const tel = np.getElementsByTagName('text')[0];
+          const cel = np.getElementsByTagName('content')[0];
+          if (tel && cel && cel.getAttribute('src')) {
+            map.set(resolveZipPath(opfDir, cel.getAttribute('src').split('#')[0]), (tel.textContent || '').trim());
+          }
+        });
+      }
+    }
+  } catch (e) { /* 目录缺失时退化为按节命名 */ }
+  return map;
+}
+function extractBlocks(root) {
+  const blocks = [];
+  const addP = el => { const t = el.textContent.replace(/\s+/g, ' ').trim(); if (t) blocks.push({ type: 'p', text: t }); };
+  (function walk(node) {
+    for (const el of [...node.children]) {
+      const tag = el.tagName.toLowerCase();
+      if (/^(script|style|link|meta|svg|image|iframe|object|figure|img)$/.test(tag)) continue;
+      if (/^h[1-6]$/.test(tag)) { const t = el.textContent.trim(); if (t) blocks.push({ type: tag, text: t }); }
+      else if (tag === 'blockquote') { const t = el.textContent.replace(/\s+/g, ' ').trim(); if (t) blocks.push({ type: 'quote', text: t }); }
+      else if (tag === 'pre') { const t = el.textContent.replace(/\s+$/, ''); if (t.trim()) blocks.push({ type: 'code', text: t }); }
+      else if (tag === 'ul' || tag === 'ol') {
+        const items = [...el.children].filter(li => li.tagName.toLowerCase() === 'li').map(li => li.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
+        if (items.length) blocks.push({ type: tag, items });
+      }
+      else if (tag === 'p') addP(el);
+      else if (el.children.length) walk(el);
+      else addP(el);
+    }
+  })(root);
+  return blocks;
+}
+async function parseEpub(file) {
+  await loadScript(CDN.jszip);
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const container = await zipText(zip, 'META-INF/container.xml');
+  if (!container) throw new Error('EPUB 结构异常（缺少 container.xml）');
+  const opfPath = (container.match(/full-path="([^"]+)"/) || [])[1];
+  if (!opfPath) throw new Error('EPUB 结构异常（未找到 OPF）');
+  const opfDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+  const opf = new DOMParser().parseFromString(await zipText(zip, opfPath), 'application/xml');
+  const title = textOfXml(opf, 'title') || file.name.replace(/\.[^.]+$/, '');
+  const author = textOfXml(opf, 'creator');
+  const manifest = {};
+  [...opf.querySelectorAll('manifest > item')].forEach(it => {
+    manifest[it.getAttribute('id')] = { href: it.getAttribute('href'), type: it.getAttribute('media-type') || '', props: it.getAttribute('properties') || '' };
+  });
+  const tocMap = await buildEpubToc(zip, opf, opfDir, manifest);
+  const chapters = [];
+  for (const ref of [...opf.querySelectorAll('spine > itemref')]) {
+    const item = manifest[ref.getAttribute('idref')];
+    if (!item || !/x?html/.test(item.type)) continue;
+    const p = resolveZipPath(opfDir, item.href);
+    const html = await zipText(zip, p);
+    if (html == null) continue;
+    const cdoc = new DOMParser().parseFromString(html, 'text/html');
+    const blocks = extractBlocks(cdoc.body || cdoc.documentElement);
+    const joined = blocks.map(b => b.text || '').join('').trim();
+    if (!joined) continue;
+    chapters.push({ title: tocMap.get(p) || (cdoc.title || '').trim() || ('第 ' + (chapters.length + 1) + ' 节'), blocks });
+  }
+  if (!chapters.length) throw new Error('未能解析出章节内容（可能是图片型 EPUB）');
+  let cover = null;
+  try {
+    const coverItem = Object.values(manifest).find(m => /cover-image/.test(m.props))
+      || manifest[(opf.querySelector('meta[name="cover"]') || {}).getAttribute ? (opf.querySelector('meta[name="cover"]') || { getAttribute: () => null }).getAttribute('content') : null];
+    if (coverItem && /^image\//.test(coverItem.type)) {
+      const cf = zipFind(zip, resolveZipPath(opfDir, coverItem.href));
+      if (cf) cover = await blobToDataURL(await cf.async('blob'));
+    }
+  } catch (e) {}
+  return makeRec({ title, author, format: 'epub', content: { chapters }, cover: cover || makeCover(title, author), blob: file });
+}
+function blobToDataURL(blob) { return new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); }); }
+/* --- PDF --- */
+let _pdfReady = false;
+async function ensurePdfjs() {
+  await loadScript(CDN.pdfjs);
+  if (!_pdfReady) { window.pdfjsLib.GlobalWorkerOptions.workerSrc = CDN.pdfjsWorker; _pdfReady = true; }
+}
+/* 中日韩字符判定（含中文标点与全角）——用于 PDF 文本层的智能空格 */
+const _CJK_RE = /[\u2e80-\u2eff\u2f00-\u2fdf\u3000-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+function isCJK(ch) { return !!ch && _CJK_RE.test(ch); }
+
+/* 中文文本归一化：解决 PDF 字体映射把汉字落到「康熙部首区 / CJK 部首补充区」的顽疾
+   典型症状：正文是「留⽩」，用户搜「留白」搜不到 —— 检索、摘要、问答全线失效。
+   ① 康熙部首区 U+2F00–U+2FDF：由 Unicode 兼容映射离线展开
+   ② 部首补充区 U+2E80–U+2EFF：Unicode 无兼容映射，手工补齐常用字
+   共 298 条，构建期生成，运行时零依赖
+   注意：正文与检索词必须走同一个函数，否则单边转换没有意义。 */
+const _RAD_MAP = {
+  '\u2e85':'人','\u2e88':'刀','\u2e89':'刀','\u2e8a':'卜','\u2e8c':'小','\u2e92':'巳',
+  '\u2e93':'幺','\u2e96':'心','\u2e97':'心','\u2e98':'手','\u2e9b':'旡','\u2e9c':'日',
+  '\u2e9d':'月','\u2e9e':'歹','\u2ea0':'民','\u2ea1':'水','\u2ea2':'水','\u2ea3':'火',
+  '\u2ea4':'爪','\u2ea5':'爪','\u2ea7':'牛','\u2ea8':'犬','\u2eb6':'羊','\u2eb7':'羊',
+  '\u2eb8':'羊','\u2eb9':'老','\u2eba':'聿','\u2ebb':'聿','\u2ebc':'肉','\u2ebd':'臼',
+  '\u2ebe':'艹','\u2ebf':'艹','\u2ec0':'艹','\u2ec1':'虎','\u2ec2':'衣','\u2ec3':'西',
+  '\u2ec4':'西','\u2ec5':'见','\u2ec6':'角','\u2ec7':'角','\u2ec8':'讠','\u2ec9':'贝',
+  '\u2eca':'足','\u2ecb':'车','\u2ecc':'辶','\u2ecd':'辶','\u2ece':'辶','\u2ecf':'邑',
+  '\u2ed0':'钅','\u2ed1':'长','\u2ed2':'长','\u2ed3':'长','\u2ed4':'门','\u2ed5':'阜',
+  '\u2ed6':'阜','\u2ed7':'雨','\u2ed8':'青','\u2ed9':'韦','\u2eda':'页','\u2edb':'风',
+  '\u2edc':'飞','\u2edd':'食','\u2ede':'食','\u2edf':'食','\u2ee0':'饣','\u2ee1':'首',
+  '\u2ee2':'马','\u2ee3':'骨','\u2ee4':'鬼','\u2ee5':'鱼','\u2ee6':'鸟','\u2ee7':'卤',
+  '\u2ee8':'麦','\u2ee9':'黄','\u2eea':'黾','\u2eeb':'齐','\u2eec':'齐','\u2eed':'齿',
+  '\u2eee':'齿','\u2eef':'龙','\u2ef0':'龙','\u2ef1':'龟','\u2ef2':'龟','\u2ef3':'龟',
+  '\u2f00':'一','\u2f01':'丨','\u2f02':'丶','\u2f03':'丿','\u2f04':'乙','\u2f05':'亅',
+  '\u2f06':'二','\u2f07':'亠','\u2f08':'人','\u2f09':'儿','\u2f0a':'入','\u2f0b':'八',
+  '\u2f0c':'冂','\u2f0d':'冖','\u2f0e':'冫','\u2f0f':'几','\u2f10':'凵','\u2f11':'刀',
+  '\u2f12':'力','\u2f13':'勹','\u2f14':'匕','\u2f15':'匚','\u2f16':'匸','\u2f17':'十',
+  '\u2f18':'卜','\u2f19':'卩','\u2f1a':'厂','\u2f1b':'厶','\u2f1c':'又','\u2f1d':'口',
+  '\u2f1e':'囗','\u2f1f':'土','\u2f20':'士','\u2f21':'夂','\u2f22':'夊','\u2f23':'夕',
+  '\u2f24':'大','\u2f25':'女','\u2f26':'子','\u2f27':'宀','\u2f28':'寸','\u2f29':'小',
+  '\u2f2a':'尢','\u2f2b':'尸','\u2f2c':'屮','\u2f2d':'山','\u2f2e':'巛','\u2f2f':'工',
+  '\u2f30':'己','\u2f31':'巾','\u2f32':'干','\u2f33':'幺','\u2f34':'广','\u2f35':'廴',
+  '\u2f36':'廾','\u2f37':'弋','\u2f38':'弓','\u2f39':'彐','\u2f3a':'彡','\u2f3b':'彳',
+  '\u2f3c':'心','\u2f3d':'戈','\u2f3e':'戶','\u2f3f':'手','\u2f40':'支','\u2f41':'攴',
+  '\u2f42':'文','\u2f43':'斗','\u2f44':'斤','\u2f45':'方','\u2f46':'无','\u2f47':'日',
+  '\u2f48':'曰','\u2f49':'月','\u2f4a':'木','\u2f4b':'欠','\u2f4c':'止','\u2f4d':'歹',
+  '\u2f4e':'殳','\u2f4f':'毋','\u2f50':'比','\u2f51':'毛','\u2f52':'氏','\u2f53':'气',
+  '\u2f54':'水','\u2f55':'火','\u2f56':'爪','\u2f57':'父','\u2f58':'爻','\u2f59':'爿',
+  '\u2f5a':'片','\u2f5b':'牙','\u2f5c':'牛','\u2f5d':'犬','\u2f5e':'玄','\u2f5f':'玉',
+  '\u2f60':'瓜','\u2f61':'瓦','\u2f62':'甘','\u2f63':'生','\u2f64':'用','\u2f65':'田',
+  '\u2f66':'疋','\u2f67':'疒','\u2f68':'癶','\u2f69':'白','\u2f6a':'皮','\u2f6b':'皿',
+  '\u2f6c':'目','\u2f6d':'矛','\u2f6e':'矢','\u2f6f':'石','\u2f70':'示','\u2f71':'禸',
+  '\u2f72':'禾','\u2f73':'穴','\u2f74':'立','\u2f75':'竹','\u2f76':'米','\u2f77':'糸',
+  '\u2f78':'缶','\u2f79':'网','\u2f7a':'羊','\u2f7b':'羽','\u2f7c':'老','\u2f7d':'而',
+  '\u2f7e':'耒','\u2f7f':'耳','\u2f80':'聿','\u2f81':'肉','\u2f82':'臣','\u2f83':'自',
+  '\u2f84':'至','\u2f85':'臼','\u2f86':'舌','\u2f87':'舛','\u2f88':'舟','\u2f89':'艮',
+  '\u2f8a':'色','\u2f8b':'艸','\u2f8c':'虍','\u2f8d':'虫','\u2f8e':'血','\u2f8f':'行',
+  '\u2f90':'衣','\u2f91':'襾','\u2f92':'見','\u2f93':'角','\u2f94':'言','\u2f95':'谷',
+  '\u2f96':'豆','\u2f97':'豕','\u2f98':'豸','\u2f99':'貝','\u2f9a':'赤','\u2f9b':'走',
+  '\u2f9c':'足','\u2f9d':'身','\u2f9e':'車','\u2f9f':'辛','\u2fa0':'辰','\u2fa1':'辵',
+  '\u2fa2':'邑','\u2fa3':'酉','\u2fa4':'釆','\u2fa5':'里','\u2fa6':'金','\u2fa7':'長',
+  '\u2fa8':'門','\u2fa9':'阜','\u2faa':'隶','\u2fab':'隹','\u2fac':'雨','\u2fad':'靑',
+  '\u2fae':'非','\u2faf':'面','\u2fb0':'革','\u2fb1':'韋','\u2fb2':'韭','\u2fb3':'音',
+  '\u2fb4':'頁','\u2fb5':'風','\u2fb6':'飛','\u2fb7':'食','\u2fb8':'首','\u2fb9':'香',
+  '\u2fba':'馬','\u2fbb':'骨','\u2fbc':'高','\u2fbd':'髟','\u2fbe':'鬥','\u2fbf':'鬯',
+  '\u2fc0':'鬲','\u2fc1':'鬼','\u2fc2':'魚','\u2fc3':'鳥','\u2fc4':'鹵','\u2fc5':'鹿',
+  '\u2fc6':'麥','\u2fc7':'麻','\u2fc8':'黃','\u2fc9':'黍','\u2fca':'黑','\u2fcb':'黹',
+  '\u2fcc':'黽','\u2fcd':'鼎','\u2fce':'鼓','\u2fcf':'鼠','\u2fd0':'鼻','\u2fd1':'齊',
+  '\u2fd2':'齒','\u2fd3':'龍','\u2fd4':'龜','\u2fd5':'龠'
+};
+function normalizeCJK(s) {
+  if (!s) return s;
+  s = String(s);
+  /* 纯查表：只替换部首区字符，全角标点与其余字符一律不动
+     （此前用 NFKC 会把「，：」折成半角，反而破坏中文排版） */
+  if (!/[\u2e80-\u2fdf]/.test(s)) return s;
+  return s.replace(/[\u2e80-\u2fdf]/g, ch => _RAD_MAP[ch] || ch);
+}
+
+/* --- PDF 书签（outline）→ 页码 ---
+   dest 有两种形式：① 目标数组 [pageRef, ...] ② 命名目标字符串（需 getDestination 解析）
+   任一环节失败返回 -1，由调用方跳过该条，不影响整体解析 */
+async function pdfDestToPage(doc, item) {
+  let dest = item.dest;
+  if (!dest) return -1;
+  try {
+    if (typeof dest === 'string') dest = await doc.getDestination(dest);
+    if (!Array.isArray(dest) || !dest[0]) return -1;
+    return (await doc.getPageIndex(dest[0])) + 1;   // 转 1-based
+  } catch (e) { return -1; }
+}
+
+/* 递归展开多级书签 → [{title, page, level}]，最多下钻 3 层避免目录过碎
+   按页码排序：章节划分依赖「下一书签页 - 1」，乱序会导致区间为负 */
+async function pdfOutline(doc) {
+  let ol = null;
+  try { ol = await doc.getOutline(); } catch (e) { return []; }
+  if (!ol || !ol.length) return [];
+  const out = [];
+  const walk = async (items, level) => {
+    if (level > 3) return;
+    for (const it of items) {
+      const page = await pdfDestToPage(doc, it);
+      if (page > 0) out.push({ title: (it.title || '').trim() || ('第 ' + page + ' 页'), page, level });
+      if (it.items && it.items.length) await walk(it.items, level + 1);
+    }
+  };
+  await walk(ol, 0);
+  return out.sort((a, b) => a.page - b.page);
+}
+
+async function parsePdf(file) {
+  await ensurePdfjs();
+  const buf = await file.arrayBuffer();
+  const doc = await window.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+  const meta = await doc.getMetadata().catch(() => null);
+  const title = (meta && meta.info && meta.info.Title || '').trim() || file.name.replace(/\.[^.]+$/, '');
+  const author = (meta && meta.info && meta.info.Author || '').trim();
+  const N = doc.numPages;
+
+  const toc = await pdfOutline(doc);   // ① 先拿书签，它决定章节怎么切
+
+  const pageTexts = [];                // ② 逐页抽文本层
+  for (let p = 1; p <= N; p++) {
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    let out = '', lastY = null;
+    for (const it of tc.items) {
+      const y = it.transform ? it.transform[5] : null;
+      const s = it.str || '';
+      if (out) {
+        if (lastY != null && y != null && Math.abs(y - lastY) > 3) out += '\n';
+        /* 关键：PDF 中常以单字为独立文本块，无脑补空格会把中文打散成「解 析 验 证」
+           → 检索失效、摘要质量下降。仅在中日韩字符之间省略空格 */
+        else if (s && (!isCJK(out[out.length - 1]) || !isCJK(s[0]))) out += ' ';
+      }
+      out += s;
+      if (it.hasEOL) out += '\n';
+      lastY = y;
+    }
+    pageTexts.push(out.split('\n').map(x => normalizeCJK(x).replace(/\s+/g, ' ').trim()).filter(Boolean).map(x => ({ type: 'p', text: x })));
+    if (p % 25 === 0) toast('解析文本层 ' + p + ' / ' + N + ' 页…', 900);
+  }
+
+  /* ③ 按书签分组章节：每个书签领一段 [start, end] 的页
+       首章从 1 开始，把书签之前的封面/前言页并进来（否则这些内容会凭空消失）
+       书签全部解析失败时回退为「每页一章」，保持旧行为 */
+  const chapters = [];
+  const collect = (a, b) => { const r = []; for (let p = a; p <= b; p++) if (pageTexts[p - 1]) r.push(...pageTexts[p - 1]); return r; };
+  if (toc.length) {
+    for (let i = 0; i < toc.length; i++) {
+      const start = i === 0 ? 1 : toc[i].page;
+      const end = i + 1 < toc.length ? toc[i + 1].page - 1 : N;
+      if (end < start) continue;
+      const blocks = collect(start, end);
+      chapters.push({ title: toc[i].title, level: toc[i].level || 0, pageStart: start, pageEnd: end, blocks: blocks.length ? blocks : [{ type: 'p', text: '' }] });
+    }
+  }
+  if (!chapters.length) {
+    for (let p = 1; p <= N; p++) chapters.push({ title: '第 ' + p + ' 页', level: 0, pageStart: p, pageEnd: p, blocks: pageTexts[p - 1] || [] });
+  }
+
+  await doc.destroy();
+  return makeRec({ title, author, format: 'pdf', content: { chapters, pageCount: N, toc }, cover: makeCover(title, author), blob: file });
+}
+/* --- TXT / MD --- */
+async function parseTxt(file) {
+  const text = await readFileText(file);
+  const title = file.name.replace(/\.[^.]+$/, '');
+  return makeRec({ title, author: '', format: 'txt', content: { chapters: chapterizeTxt(text) }, cover: makeCover(title, '') });
+}
+async function parseMd(file) {
+  const text = await readFileText(file);
+  const title = file.name.replace(/\.[^.]+$/, '');
+  return makeRec({ title, author: '', format: 'md', content: { chapters: chapterizeMd(text) }, cover: makeCover(title, '') });
+}
+function makeRec({ title, author, format, content, cover, blob }) {
+  return {
+    id: uid(), title, author: author || '', format, content, cover: cover || makeCover(title, author || ''), blob: blob || null,
+    addedAt: Date.now(), lastOpened: 0,
+    progress: { chapterIndex: 0, scrollPct: 0, page: 1 },
+    readMs: 0, readMsWeek: 0, weekKey: weekKeyOf(Date.now())
+  };
+}
+function wrapText(g, text, x, y, maxW, lh, maxLines) {
+  const chars = [...String(text)]; let line = '', yy = y, lines = 0;
+  const draw = () => { g.fillText(line, x, yy); line = ''; yy += lh; lines++; };
+  for (const ch of chars) {
+    if (lines >= maxLines - 1 && g.measureText(line + ch).width > maxW) { line += '…'; draw(); return; }
+    if (g.measureText(line + ch).width > maxW) draw();
+    line += ch;
+  }
+  if (line) draw();
+}
+function makeCover(title, author) {
+  const c = document.createElement('canvas'); c.width = 600; c.height = 800;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fafaf7'; g.fillRect(0, 0, 600, 800);
+  g.strokeStyle = '#1a1a1a'; g.lineWidth = 2; g.strokeRect(34, 34, 532, 732);
+  g.fillStyle = '#1a1a1a'; g.font = '700 58px "Songti SC","STSong",serif';
+  wrapText(g, title, 66, 170, 468, 78, 5);
+  g.fillStyle = '#c8102e'; g.fillRect(66, 648, 44, 9);
+  g.fillStyle = '#666'; g.font = '26px "Helvetica Neue","PingFang SC",sans-serif';
+  g.fillText((author || '佚名').slice(0, 20), 66, 706);
+  g.fillStyle = '#999'; g.font = '22px "Courier New",monospace';
+  g.fillText('INKSTONE', 66, 742);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+
+/* ================= M4 · 书架 ================= */
+async function importFiles(files) {
+  if (!files || !files.length) return;
+  for (const f of files) {
+    try {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      let rec;
+      if (ext === 'pdf') { toast('正在解析《' + f.name + '》…', 4000); rec = await parsePdf(f); }
+      else if (ext === 'epub') { toast('正在解析《' + f.name + '》…', 4000); rec = await parseEpub(f); }
+      else if (ext === 'txt') rec = await parseTxt(f);
+      else if (ext === 'md' || ext === 'markdown') rec = await parseMd(f);
+      else { toast('暂不支持 .' + ext + '（支持 PDF / EPUB / TXT / MD）'); continue; }
+      const dup = S.books.find(b => b.title === rec.title);
+      if (dup && !confirm('书架已有《' + rec.title + '》，仍要再导入一份吗？')) continue;
+      await dbPut('books', rec); S.books.push(rec);
+      renderLibrary();
+      toast('已导入《' + rec.title + '》');
+    } catch (err) {
+      console.error(err);
+      toast('导入失败：' + f.name + '（' + (err.message || err) + '）', 3600);
+    }
+  }
+}
+function bookPct(b) {
+  if (b.format === 'pdf') return b.content.pageCount ? b.progress.page / b.content.pageCount : 0;
+  const n = b.content.chapters.length || 1;
+  const c = Math.min(b.progress.chapterIndex || 0, n - 1);
+  return (c + (b.progress.scrollPct || 0)) / n;
+}
+async function deleteBook(id) {
+  const b = S.books.find(x => x.id === id); if (!b) return;
+  if (!confirm('删除《' + b.title + '》及其全部批注？此操作不可恢复。')) return;
+  await dbDelete('books', id);
+  S.books = S.books.filter(x => x.id !== id);
+  const gone = S.allAnns.filter(a => a.bookId === id);
+  for (const a of gone) await dbDelete('anns', a.id);
+  S.allAnns = S.allAnns.filter(a => a.bookId !== id);
+  renderLibrary(); toast('已删除《' + b.title + '》');
+}
+/* 书架排序 + 筛选。偏好存进 prefs，刷新后保持。 */
+function libSortedBooks(annByBook) {
+  const p = getPrefs();
+  const f = p.libFilter || 'all', s = p.libSort || 'recent';
+  const noted = annByBook || (() => { const m = {}; S.allAnns.forEach(a => m[a.bookId] = (m[a.bookId] || 0) + 1); return m; })();
+  const list = S.books.filter(b => {
+    if (f === 'pdf' || f === 'epub') return b.format === f;
+    if (f === 'text') return b.format === 'txt' || b.format === 'md' || b.format === 'markdown';
+    /* 「在读」= 打开过且没读完。刚打开还没翻页（进度 0）也算在读，否则新书会从筛选里消失 */
+    if (f === 'reading') return b.lastOpened > 0 && bookPct(b) < 0.995;
+    if (f === 'noted') return !!noted[b.id];
+    return true;
+  });
+  const cmp = {
+    recent:   (a, b) => (b.lastOpened || 0) - (a.lastOpened || 0),
+    added:    (a, b) => (b.addedAt || 0) - (a.addedAt || 0),
+    title:    (a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'zh-Hans-CN'),
+    progress: (a, b) => bookPct(b) - bookPct(a)
+  }[s];
+  return list.sort(cmp || ((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0)));
+}
+function renderLibrary() {
+  const stats = $('#lib-stats');
+  const wk = weekKeyOf(Date.now());
+  const weekMs = S.books.reduce((acc, b) => acc + (b.weekKey === wk ? (b.readMsWeek || 0) : 0), 0);
+  const reading = S.books.filter(b => b.lastOpened > 0).length;
+  stats.innerHTML = `本周阅读 <b>${fmtMin(weekMs)}</b><span>在读 <b>${reading}</b> 本</span><span>馆藏 <b>${S.books.length}</b> 本</span><span id="stat-anns" style="cursor:pointer" title="查看全部批注">批注 <b>${S.allAnns.length}</b> 条 ↗</span>`;
+  $('#onboard').hidden = S.books.length > 0;
+  renderBackupHint();
+  const grid = $('#book-grid');
+  const annByBook = {};
+  S.allAnns.forEach(a => { annByBook[a.bookId] = (annByBook[a.bookId] || 0) + 1; });
+  const list = libSortedBooks(annByBook);
+  const f = getPrefs().libFilter || 'all';
+  $('#lib-tools').hidden = S.books.length < 2;
+  $('#lt-sort').value = getPrefs().libSort || 'recent';
+  $$('#lib-tools [data-f]').forEach(x => x.classList.toggle('cur', x.dataset.f === f));
+  $('#lt-count').textContent = list.length === S.books.length
+    ? S.books.length + ' 本' : list.length + ' / ' + S.books.length + ' 本';
+  grid.innerHTML = (list.length ? '' :
+    `<div style="grid-column:1/-1;font-family:var(--sans);font-size:13px;color:var(--aux);padding:4px 0 6px">当前筛选「${esc(f === 'text' ? '文字' : f === 'noted' ? '有批注' : f === 'reading' ? '在读' : f.toUpperCase())}」下没有书</div>`)
+    + list.map(b => {
+    const pct = Math.round(bookPct(b) * 100);
+    return `<div class="book-card" data-id="${b.id}">
+      <div class="cover">
+        <img src="${b.cover}" alt="">
+        <span class="fmt">${b.format.toUpperCase()}</span>
+        ${annByBook[b.id] ? `<span class="annbadge">${annByBook[b.id]}</span>` : ''}
+        <button class="del" title="删除">×</button>
+      </div>
+      <div class="meta">
+        <div class="t">${esc(b.title)}</div>
+        <div class="a">${esc(b.author || '佚名')}</div>
+        <div class="p">${b.lastOpened ? pct + '%' : '未读'} · ${b.format === 'pdf'
+          ? (b.content.toc && b.content.toc.length
+              ? b.content.chapters.length + ' 章 / ' + b.content.pageCount + ' 页'
+              : b.content.pageCount + ' 页')
+          : b.content.chapters.length + ' 章'}</div>
+      </div>
+    </div>`;
+  }).join('') + `<div id="import-card"><span class="plus">＋</span><span class="txt">导入书籍</span><span class="fmts">PDF / EPUB / TXT / MD</span></div>`;
+}
+
+/* ================= M5 · 阅读器 ================= */
+function showView(name) {
+  $('#view-library').hidden = name !== 'library';
+  $('#lib-bar').hidden = name !== 'library';
+  $('#view-reader').hidden = name !== 'reader';
+}
+function scrollPct() {
+  const st = $('#reader-stage');
+  const d = st.scrollHeight - st.clientHeight;
+  return d > 0 ? Math.min(1, Math.max(0, st.scrollTop / d)) : 0;
+}
+async function openBook(id) {
+  const b = S.books.find(x => x.id === id); if (!b) return;
+  S.current = b; S.chapter = 0; S.pdfDoc = null; S.pdfZoom = 1;
+  b.lastOpened = Date.now();
+  await dbPut('books', b);
+  S.anns = S.allAnns.filter(a => a.bookId === id);
+  showView('reader'); stopSpeak();
+  if (b.format === 'pdf') {
+    $('#text-view').hidden = true; $('#pdf-view').hidden = false;
+    if (migratePdfChapters(b)) await dbPut('books', b);   // 旧书补齐章节区间，一次性迁移
+    await openPdf(b);
+  } else {
+    $('#text-view').hidden = false; $('#pdf-view').hidden = true;
+    applyPrefs();
+    renderChapter(b.progress.chapterIndex || 0, b.progress.scrollPct || 0);
+  }
+  renderToc(); renderAnnotSidebar(); updateReaderChrome();
+}
+function closeReader() {
+  saveProgressNow(); stopSpeak();
+  showView('library'); renderLibrary();
+  $$('.drawer').forEach(d => d.classList.remove('open'));
+  $('#typo-pop').hidden = true;
+}
+function updateReaderChrome() {
+  const b = S.current; if (!b) return;
+  $('#rb-title').textContent = '《' + b.title + '》';
+  if (b.format === 'pdf') {
+    const ch = b.content.chapters[curChapterIndex()];
+    /* 有真实章节结构时才显示章节名，纯「第 N 页」的旧数据不必重复显示 */
+    const named = ch && ch.pageStart != null && ch.pageEnd > ch.pageStart;
+    const pg = (S.pdfPage || 1) + ' / ' + (b.content.pageCount || '?');
+    $('#rb-chapter').textContent = pg + (named ? '　' + ch.title : '');
+    $('#pdf-page-label').textContent = pg;   // 底部页码标签此前从未被赋值，一直是空白
+  } else {
+    $('#rb-chapter').textContent = (S.chapter + 1) + ' / ' + b.content.chapters.length;
+  }
+}
+function renderChapter(i, restorePct) {
+  const b = S.current; if (!b || b.format === 'pdf') return;
+  const ch = b.content.chapters[i]; if (!ch) return;
+  const keep = restorePct != null ? restorePct : (i === S.chapter ? scrollPct() : 0);
+  S.chapter = i;
+  const art = $('#reader-content');
+  art.innerHTML = renderBlocks(ch.blocks);
+  for (const a of S.anns.filter(a => a.chapterIndex === i && a.type !== 'pagenote')) applyOneMark(art, a);
+  const st = $('#reader-stage');
+  st.scrollTop = keep * (st.scrollHeight - st.clientHeight);
+  updateReaderChrome(); renderToc();
+  saveProgress();
+}
+function goChapter(i) {
+  const b = S.current; if (!b) return;
+  const n = b.content.chapters.length;
+  const idx = Math.max(0, Math.min(n - 1, i));
+  /* PDF 走 canvas 单页渲染，renderChapter 对它无效 —— 改为跳到该章起始页 */
+  if (b.format === 'pdf') {
+    const ch = b.content.chapters[idx];
+    S.chapter = idx;
+    if (ch && ch.pageStart) goPage(ch.pageStart);
+    renderToc();
+    return;
+  }
+  renderChapter(idx);
+}
+function saveProgress() { debounce(() => saveProgressNow(), 1200)(); }
+async function saveProgressNow() {
+  const b = S.current; if (!b) return;
+  if (b.format === 'pdf') { b.progress = { ...b.progress, page: S.pdfPage }; }
+  else { b.progress = { ...b.progress, chapterIndex: S.chapter, scrollPct: +scrollPct().toFixed(4) }; }
+  await dbPut('books', b);
+}
+/* --- 高亮定位（跨空白匹配 + Range 包裹） --- */
+function applyOneMark(root, ann) {
+  if (!ann.text) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => n.parentElement && n.parentElement.closest('mark') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+  });
+  const nodes = []; let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+  if (!nodes.length) return;
+  const map = []; let sq = '';
+  for (const node of nodes) {
+    const v = node.nodeValue;
+    for (let i = 0; i < v.length; i++) {
+      const ch = v[i];
+      if (!/\s/.test(ch)) { map.push({ node, off: i }); sq += ch; }
+    }
+  }
+  const target = ann.text.replace(/\s+/g, '');
+  const at = sq.indexOf(target);
+  if (at < 0 || target.length === 0) return;
+  const s = map[at], e = map[at + target.length - 1];
+  if (!s || !e) return;
+  try {
+    const r = document.createRange();
+    r.setStart(s.node, s.off); r.setEnd(e.node, e.off + 1);
+    const mark = document.createElement('mark');
+    mark.className = 'hl ' + (ann.type === 'underline' ? 'u ' : '') + (ann.color || 'cinnabar') + (ann.note ? ' has-note' : '') + (ann._hit ? ' hit' : '');
+    if (ann.id) mark.dataset.aid = ann.id;
+    if (ann.note) mark.title = ann.note;
+    r.surroundContents(mark);
+  } catch (err) { /* 跨元素边界，跳过视觉回显 */ }
+}
+/* 收起所有抽屉。批注侧栏在手机上是全屏遮罩，不收起的话跳转后的正文完全被挡住，
+   用户看到的就是"点了没反应"。 */
+function closeDrawers() { $$('.drawer').forEach(d => d.classList.remove('open')); }
+/* 清掉上一次定位留下的临时命中高亮，避免它占位干扰下一次文本匹配 */
+function clearHitMarks(root) {
+  (root || $('#reader-content')).querySelectorAll('mark.hl.hit').forEach(m => {
+    const p = m.parentNode; if (!p) return;
+    p.replaceChild(document.createTextNode(m.textContent), m);
+    p.normalize();
+  });
+}
+/* 让被定位的批注闪两下并滚到视野中央。返回是否真的找到了它。 */
+function flashAnn(a, isPdf) {
+  const root = isPdf ? $('#pdf-text-layer') : $('#reader-content');
+  if (!root) return false;
+  let el = isPdf ? root.querySelector('mark.hl[data-ann-id="' + a.id + '"]')
+                 : root.querySelector('mark.hl[data-aid="' + a.id + '"]');
+  if (!el && !isPdf && a.text) {
+    /* 正文里没有对应 mark（旧批注 / 文本有出入）时，临时造一个命中高亮指给用户看 */
+    applyOneMark(root, { text: a.text, color: 'hit', type: 'hit', _hit: true });
+    el = root.querySelector('mark.hl.hit');
+  }
+  if (!el) return false;
+  el.classList.add('flash');
+  try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { el.scrollIntoView({ block: 'center' }); }
+  setTimeout(() => el.scrollIntoView({ block: 'center' }), 400);
+  setTimeout(() => { el.classList.remove('flash'); if (!isPdf && el.classList.contains('hit')) clearHitMarks(root); }, 2000);
+  return true;
+}
+function revealText(text) {
+  const art = $('#reader-content');
+  clearHitMarks(art);
+  applyOneMark(art, { text, color: 'hit', type: 'hit', _hit: true });
+  const el = $('mark.hl.hit', art);
+  if (!el) return false;
+  el.classList.add('flash');
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  setTimeout(() => el.scrollIntoView({ block: 'center' }), 400);
+  return true;
+}
+/* 旧版 PDF 一章即一页、没有 pageStart。补齐区间字段，
+   否则下面的区间判定会把每一页都判成最后一章（undefined || 1 恒 ≤ 当前页） */
+function migratePdfChapters(b) {
+  if (!b || b.format !== 'pdf' || !b.content || !b.content.chapters) return false;
+  const cs = b.content.chapters;
+  if (!cs.length || cs[0].pageStart != null) return false;
+  cs.forEach((c, i) => { c.pageStart = i + 1; c.pageEnd = i + 1; c.level = c.level || 0; });
+  return true;
+}
+/* 当前所属章节序号：PDF 按页区间判定（从后往前找首个起点 ≤ 当前页），其余直接用 S.chapter */
+function curChapterIndex() {
+  const b = S.current; if (!b) return -1;
+  if (b.format === 'pdf') {
+    const cs = b.content.chapters || [];
+    if (!cs.length) return 0;
+    /* 尚未迁移的旧数据兜底：一章即一页，直接按页码映射 */
+    if (cs[0].pageStart == null) return Math.max(0, Math.min(cs.length - 1, (S.pdfPage || 1) - 1));
+    for (let i = cs.length - 1; i >= 0; i--) if (S.pdfPage >= (cs[i].pageStart || 1)) return i;
+    return 0;
+  }
+  return S.chapter;
+}
+function renderToc() {
+  const b = S.current; if (!b) return;
+  const cur = curChapterIndex();
+  $('#toc-list').innerHTML = b.content.chapters.map((ch, i) =>
+    `<a data-i="${i}" class="${i === cur ? 'cur' : ''}${ch.level ? ' lv' + ch.level : ''}">${esc(ch.title)}</a>`
+  ).join('');
+}
+/* --- 排版偏好 --- */
+function applyPrefs() {
+  const p = getPrefs();
+  const fs = p.fs || 19, lhIdx = p.lhIdx == null ? 2 : p.lhIdx, paraIdx = p.paraIdx == null ? 1 : p.paraIdx, theme = p.theme || 'paper';
+  const font = p.font || 'serif';
+  const tv = $('#text-view');
+  tv.style.setProperty('--fs', fs + 'px');
+  tv.style.setProperty('--lh', LH_LEVELS[lhIdx]);
+  tv.style.setProperty('--para', PARA_LEVELS[paraIdx]);
+  /* 字体：正文跟随选择，标题恒用无衬线（宋体档保留"宋体正文+黑体标题"的设计师惯例） */
+  tv.style.setProperty('--rfont', 'var(--' + font + ')');
+  tv.style.setProperty('--rhead', 'var(--sans)');
+  tv.dataset.theme = theme;
+  $('#t-fs').value = fs; $('#t-fs-v').textContent = fs + 'px';
+  $('#t-lh').value = lhIdx; $('#t-lh-v').textContent = LH_LEVELS[lhIdx];
+  $('#t-para').value = paraIdx; $('#t-para-v').textContent = PARA_LEVELS[paraIdx];
+  $$('#typo-pop .th').forEach(t => t.classList.toggle('sel', t.dataset.th === theme));
+  $$('#typo-pop .ft').forEach(t => t.classList.toggle('sel', t.dataset.font === font));
+}
+/* --- PDF 视图 --- */
+async function openPdf(b) {
+  await ensurePdfjs();
+  try {
+    S.pdfDoc = await window.pdfjsLib.getDocument({ data: await b.blob.arrayBuffer() }).promise;
+  } catch (err) { toast('PDF 打开失败：' + (err.message || err)); return; }
+  S.pdfPage = Math.min(Math.max(1, b.progress.page || 1), S.pdfDoc.numPages);
+  S.chapter = curChapterIndex();   // 章节指针跟随页码，页级批注才能归到正确的章
+  await renderPdfPage();
+}
+async function renderPdfPage() {
+  if (!S.pdfDoc || !S.current) return;
+  const page = await S.pdfDoc.getPage(S.pdfPage);
+  const wrap = $('#pdf-canvas-wrap');
+  const stageW = (wrap.parentElement.clientWidth || 900) - 30;
+  const base = page.getViewport({ scale: 1 });
+  const fit = Math.min(2.5, Math.max(0.4, stageW / base.width));
+  const vp = page.getViewport({ scale: fit * S.pdfZoom });
+  const canvas = $('#pdf-canvas');
+  canvas.width = vp.width; canvas.height = vp.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+
+  /* ↓ 文本层：让 PDF 可选中、可划词、可复制 */
+  const layer = $('#pdf-text-layer');
+  layer.innerHTML = '';
+  layer.style.setProperty('--scale-factor', vp.scale);
+  /* canvas 受 max-width 约束会被 CSS 缩放，文本层必须按同一比例校正，否则高亮会错位 */
+  const dispW = canvas.clientWidth || vp.width;
+  const corr = dispW / vp.width;
+  layer.style.width = vp.width + 'px';
+  layer.style.height = vp.height + 'px';
+  layer.style.transform = (corr && Math.abs(corr - 1) > 0.005) ? 'scale(' + corr + ')' : '';
+  layer.style.left = Math.max(0, (wrap.clientWidth - dispW) / 2) + 'px';
+  layer.style.top = '0px';
+  try {
+    const tc = await page.getTextContent();
+    if (window.pdfjsLib.renderTextLayer) {
+      await window.pdfjsLib.renderTextLayer({ textContent: tc, container: layer, viewport: vp, textDivs: [] }).promise;
+    }
+    /* 关键：把文本层里的部首字归一化为正字。
+       不做这一步 —— 选区捕获到「留⽩」、批注存「留白」、重绘时两者永远对不上，
+       高亮会静默失效，且用户复制出去的也是部首字。 */
+    layer.querySelectorAll('span').forEach(sp => {
+      const n = sp.firstChild;
+      if (n && n.nodeType === 3 && n.nodeValue) {
+        const v = normalizeCJK(n.nodeValue);
+        if (v !== n.nodeValue) n.nodeValue = v;
+      }
+    });
+    /* 保存无 mark 的干净快照：高亮重绘前先还原，
+       否则 mark 内的文本会被排除出字符序列，导致后续批注定位累积漂移 */
+    S.pdfLayerHTML = layer.innerHTML;
+    S.pdfLayerPage = S.pdfPage;
+    S.pdfLayerScale = vp.scale;
+  } catch (e) { /* 文本层失败不影响 canvas 阅读 */ }
+
+  applyPdfMarks();
+  updateReaderChrome(); renderToc(); saveProgress();
+}
+
+/* PDF 高亮重绘：把本页的 highlight / underline 批注回填到文本层
+   —— 按 span 分组做字符级精确高亮。span 是 absolute 定位，
+      在 span 内部做 inline 拆分不会破坏布局（拆分后仍继承 span 的 left/top）。 */
+function applyPdfMarks() {
+  const layer = $('#pdf-text-layer');
+  if (!layer || !S.current || S.current.format !== 'pdf') return;
+  const anns = S.anns.filter(a => a.page === S.pdfPage && (a.type === 'highlight' || a.type === 'underline') && a.text);
+  /* 还原干净快照后再统一重绘（本页没有批注时也要还原，以清除删批注后残留的 mark） */
+  if (S.pdfLayerHTML && S.pdfLayerPage === S.pdfPage && layer.innerHTML !== S.pdfLayerHTML) {
+    layer.innerHTML = S.pdfLayerHTML;
+  }
+  if (!anns.length) return;
+
+  /* 构建「去空白字符序列 → (文本节点, 原始下标)」映射。
+     每处理完一条都要重建 —— splitText 会截断节点，让旧映射里的下标失效。 */
+  const buildMap = () => {
+    const nodes = [];
+    const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => (n.parentElement && n.parentElement.tagName === 'MARK')
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    });
+    let n; while ((n = walker.nextNode())) nodes.push(n);
+    const map = []; let sq = '';
+    for (const node of nodes) {
+      const v = node.nodeValue || '';
+      for (let i = 0; i < v.length; i++) {
+        if (!/\s/.test(v[i])) { map.push({ node, off: i }); sq += v[i]; }
+      }
+    }
+    return { map, sq };
+  };
+
+  for (const ann of anns) {
+    const target = ann.text.replace(/\s+/g, '');
+    if (!target) continue;
+    const { map, sq } = buildMap();
+    /* nth = 该文本在本页的第几次出现（PDF 页眉/重复句很常见，只取首次会标错位置） */
+    let at = -1;
+    for (let k = 0, idx = 0; k <= (ann.nth || 0); k++) {
+      idx = sq.indexOf(target, idx);
+      if (idx < 0) { at = -1; break; }
+      at = idx; idx += target.length;
+    }
+    if (at < 0) continue;
+    /* 按文本节点聚合连续区间，逐节点拆分包裹 mark（span 是 absolute，内部 inline 拆分不破坏定位） */
+    let i = at, guard = 0;
+    while (i < at + target.length && guard++ < 2000) {
+      const nd = map[i].node, startOff = map[i].off;
+      let j = i;
+      while (j + 1 < at + target.length && map[j + 1].node === nd) j++;
+      const endOff = map[j].off + 1;
+      try {
+        const full = nd.nodeValue || '';
+        if (endOff < full.length) nd.splitText(endOff);
+        const mid = nd.splitText(startOff);
+        const mk = document.createElement('mark');
+        mk.className = 'hl ' + (ann.type === 'underline' ? 'u ' : '') + (ann.color || 'cinnabar') + (ann.note ? ' has-note' : '');
+        mk.dataset.annId = ann.id;
+        nd.parentNode.insertBefore(mk, mid);
+        mk.appendChild(mid);
+      } catch (e) { /* 单条失败不影响其余批注 */ }
+      i = j + 1;
+    }
+  }
+}
+async function goPage(p) {
+  if (!S.pdfDoc) return;
+  S.pdfPage = Math.max(1, Math.min(S.pdfDoc.numPages, p));
+  S.chapter = curChapterIndex();   // 翻页后同步章节指针（批注归属依赖它）
+  await renderPdfPage();
+}
+/* --- 朗读 --- */
+let _speaking = false;
+function stopSpeak() { try { window.speechSynthesis.cancel(); } catch (e) {} _speaking = false; $('#btn-speak').textContent = '朗读'; }
+function _speak(t) {
+  const u = new SpeechSynthesisUtterance(t);
+  u.lang = 'zh-CN'; u.rate = 0.95;
+  u.onend = u.onerror = () => stopSpeak();
+  window.speechSynthesis.speak(u);
+  _speaking = true; $('#btn-speak').textContent = '停止';
+}
+function toggleSpeak() {
+  if (_speaking) return stopSpeak();
+  if (S.current && S.current.format === 'pdf') {
+    /* PDF 有了文本层即可朗读 —— 取当前页（正文已归一化为正字，不会读出部首音） */
+    const L = $('#pdf-text-layer');
+    const text = L ? [...L.querySelectorAll('span')].map(s => s.textContent).join('').replace(/\s+/g, ' ').trim() : '';
+    if (!text) { toast('本页无可朗读文本'); return; }
+    _speak(text.slice(0, 8000));
+    return;
+  }
+  const ch = S.current && S.current.content.chapters[S.chapter];
+  if (!ch) return;
+  _speak(chapterText(ch).slice(0, 8000));
+}
+
+/* ================= M6 · 批注 ================= */
+function captureSel() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return null;
+  const text = sel.toString().replace(/\s+/g, ' ').trim();
+  if (!text || text.length > 1500) { toast(text ? '选区过长（>1500 字）' : '选区无效'); return null; }
+  const layer = $('#pdf-text-layer');
+  const inPdf = !!(S.current && S.current.format === 'pdf' && layer && layer.contains(sel.anchorNode));
+  if (!inPdf && !$('#reader-content').contains(sel.anchorNode)) return null;
+  if (!inPdf) return { text, nth: 0 };
+  /* PDF：记录该文本在本页是第几次出现 —— 页眉/重复句很常见，
+     只按首次匹配重绘会把高亮标到错误位置 */
+  let nth = 0;
+  try {
+    const r = sel.getRangeAt(0);
+    const pre = document.createRange();
+    pre.setStart(layer, 0); pre.setEnd(r.startContainer, r.startOffset);
+    const before = (pre.toString() || '').replace(/\s+/g, '');
+    const target = text.replace(/\s+/g, '');
+    for (let i = 0, idx = 0; ; i++) {
+      const p = before.indexOf(target, idx);
+      if (p < 0) break;
+      nth++; idx = p + target.length;
+    }
+  } catch (e) { nth = 0; }
+  return { text: normalizeCJK(text), nth };
+}
+async function addAnnotation(color, type, note, presetText) {
+  const b = S.current; if (!b) return;
+  color = color || 'cinnabar';
+  let text, nth = 0;
+  if (presetText) text = presetText;
+  else { const s = captureSel(); if (!s) return; text = s.text; nth = s.nth || 0; }
+  const a = {
+    /* PDF 用当前页反查所属章节 —— S.chapter 只由目录点击更新，翻页时不会变，
+       直接用它会把整本书的页级批注全归到第一章 */
+    id: uid(), bookId: b.id, chapterIndex: curChapterIndex(),
+    page: b.format === 'pdf' ? S.pdfPage : null,
+    /* nth：该文本在本页的出现序号，供重绘时精确定位 */
+    nth,
+    text, color, type, note: note || '', createdAt: Date.now()
+  };
+  S.anns.push(a); S.allAnns.push(a);
+  await dbPut('anns', a);
+  try { window.getSelection().removeAllRanges(); } catch (e) {}
+  $('#sel-pop').hidden = true;
+  if (b.format !== 'pdf') renderChapter(S.chapter);
+  else applyPdfMarks();   // PDF 不整页重渲染，只把新批注回填到文本层
+  renderAnnotSidebar(); renderLibrary();
+  toast('已添加批注（' + (HL_NAMES[color] || color) + '）');
+}
+function renderAnnotSidebar() {
+  const list = [...S.anns].sort((a, b) => b.createdAt - a.createdAt);
+  $('#ann-count').textContent = list.length + ' 条';
+  $('#ann-list').innerHTML = list.length ? list.map(a => {
+    /* PDF 一律按页定位（划词批注与页级批注都显示页码，比章节名更有用） */
+    const where = (S.current && S.current.format === 'pdf') ? '第 ' + (a.page || 1) + ' 页'
+      : (S.current && S.current.content.chapters[a.chapterIndex] ? S.current.content.chapters[a.chapterIndex].title : '第 ' + (a.chapterIndex + 1) + ' 节');
+    return `<div class="ann-item" data-aid="${a.id}">
+      <div class="row1">
+        <span class="chip ${a.type === 'underline' ? 'u' : ''} c-${a.color}"></span>
+        <span class="when">${where} · ${new Date(a.createdAt).toLocaleDateString('zh-CN')}</span>
+        <span class="grow"></span>
+        <span class="ops">
+          <button data-op="jump" title="定位">定位</button> ·
+          <button data-op="edit" title="编辑">编辑</button> ·
+          <button data-op="del" title="删除">删除</button>
+        </span>
+      </div>
+      <div class="q">${esc(a.text)}</div>
+      ${a.note ? `<div class="n">${esc(a.note)}</div>` : ''}
+    </div>`;
+  }).join('') : `<div class="ann-empty">暂无批注<br>阅读时选中文本即可高亮<br>或写下想法</div>`;
+}
+async function deleteAnn(id) {
+  const a = S.anns.find(x => x.id === id); if (!a) return;
+  if (!confirm('删除这条批注？')) return;
+  await dbDelete('anns', id);
+  S.anns = S.anns.filter(x => x.id !== id);
+  S.allAnns = S.allAnns.filter(x => x.id !== id);
+  /* PDF 的 renderChapter 会直接 return，必须走 applyPdfMarks 才能清掉画面上的高亮 */
+  if (S.current) {
+    if (S.current.format === 'pdf') applyPdfMarks();
+    else renderChapter(S.chapter);
+  }
+  renderAnnotSidebar(); renderLibrary();
+}
+/* 从批注跳回原文。三个必须做全的动作：收起抽屉、跳到位置、给出可见反馈。
+   缺任何一个，用户的主观感受都是"点了没反应"。 */
+async function jumpToAnn(a) {
+  if (!S.current || a.bookId !== S.current.id) await openBook(a.bookId);
+  if (!S.current) return;
+  closeDrawers();
+  const isPdf = S.current.format === 'pdf';
+  if (isPdf || (a.type === 'pagenote' && S.pdfDoc)) {
+    const pg = a.page || 1;
+    await goPage(pg);
+    toast(flashAnn(a, true) ? '已定位 · 第 ' + pg + ' 页' : '已翻到第 ' + pg + ' 页');
+    return;
+  }
+  const ci = a.chapterIndex || 0;
+  const title = (S.current.content.chapters[ci] || {}).title || ('第 ' + (ci + 1) + ' 章');
+  if (!isPdf && S.chapter !== ci) renderChapter(ci, 0);   // 同章不重渲染，避免先弹到顶部再滚回来
+  setTimeout(() => {
+    toast(flashAnn(a, false) ? '已定位到原文' : '已跳到「' + title + '」，但未匹配到原句');
+  }, isPdf ? 0 : 90);
+}
+
+/* ================= M7 · 检索 ================= */
+let _srTab = 'text';
+function ch0Title(b, ci) { return (b.content.chapters[ci] || {}).title || ''; }
+function hlCtx(ctx, q) {
+  const i = ctx.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return esc(ctx);
+  return esc(ctx.slice(0, i)) + '<b>' + esc(ctx.slice(i, i + q.length)) + '</b>' + esc(ctx.slice(i + q.length));
+}
+function runSearch() {
+  const q = normalizeCJK($('#search-input').value.trim());
+  const out = $('#search-results');
+  if (!q) { out.innerHTML = ''; return; }
+  if (_srTab === 'ann') {
+    const res = S.allAnns.filter(a => (a.text && a.text.includes(q)) || (a.note && a.note.includes(q)))
+      .sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
+    const names = {}; S.books.forEach(b => names[b.id] = b.title);
+    out.innerHTML = res.length ? res.map(a => {
+      const where = a.type === 'pagenote' ? '第 ' + a.page + ' 页' : '第 ' + (a.chapterIndex + 1) + ' 章';
+      const inText = a.text && a.text.includes(q), inNote = a.note && a.note.includes(q);
+      return `<div class="sr-item" data-jump="${a.id}">
+        <div class="where">${esc(names[a.bookId] || '已删除')} · ${where}</div>
+        <div class="ctx">${hlCtx(a.text || '', q)}</div>
+        ${a.note ? `<div class="ctx" style="color:var(--ink)">${inNote ? '批注：' + hlCtx(a.note, q) : '批注：' + esc(a.note)}</div>` : ''}
+      </div>`;
+    }).join('') : `<div class="sr-item" style="cursor:default;color:var(--aux)">无匹配批注</div>`;
+    return;
+  }
+  const ql = q.toLowerCase();
+  const results = [];
+  for (const b of S.books) {
+    let perBook = 0;
+    for (let ci = 0; ci < b.content.chapters.length; ci++) {
+      const text = ch0Title(b, ci) + '\n' + chapterText(b.content.chapters[ci]);
+      const lower = text.toLowerCase();
+      let idx = 0;
+      while ((idx = lower.indexOf(ql, idx)) !== -1 && perBook < 5 && results.length < 200) {
+        const start = Math.max(0, idx - 40), end = Math.min(text.length, idx + ql.length + 50);
+        results.push({ bookId: b.id, bookTitle: b.title, chapterIndex: ci, chapterTitle: b.content.chapters[ci].title, ctx: (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '') });
+        idx += ql.length; perBook++;
+      }
+      if (perBook >= 5) break;
+    }
+  }
+  if (!results.length) { out.innerHTML = `<div class="sr-item" style="cursor:default;color:var(--aux)">书库中未找到「${esc(q)}」</div>`; return; }
+  const byBook = {};
+  results.forEach(r => (byBook[r.bookId] = byBook[r.bookId] || []).push(r));
+  out.innerHTML = Object.entries(byBook).map(([bid, rs]) =>
+    `<div class="sr-group"><div class="sr-book">${esc(rs[0].bookTitle)} · ${rs.length} 处</div>` +
+    rs.map(r => `<div class="sr-item" data-jump="${bid}|${r.chapterIndex}|${esc(q)}">
+      <div class="where">${esc(r.chapterTitle)}</div>
+      <div class="ctx">${hlCtx(r.ctx, q)}</div>
+    </div>`).join('') + `</div>`
+  ).join('');
+}
+async function jumpToResult(bid, ci, q) {
+  const b = S.books.find(x => x.id === bid); if (!b) return;
+  closeModal('search-modal');
+  await openBook(bid);
+  if (b.format === 'pdf') { await goPage(ci + 1); return; }
+  renderChapter(ci, 0);
+  setTimeout(() => revealText(q), 80);
+}
+
+/* ================= M8 · AI ================= */
+function aiBusy(on) { $('#ai-sum-btn').textContent = on ? '生成中…' : '生成'; $('#ai-qa-btn').textContent = on ? '检索中…' : '问'; }
+function tok(s) {
+  const arr = [];
+  (s.toLowerCase().match(/[a-z0-9]+/g) || []).forEach(w => arr.push(w));
+  const c = s.match(/[\u4e00-\u9fff]/g) || [];
+  for (let i = 0; i < c.length; i++) { arr.push(c[i]); if (i < c.length - 1) arr.push(c[i] + c[i + 1]); }
+  return arr;
+}
+function getScopeText(scope) {
+  const b = S.current; if (!b) return '';
+  if (scope === 'chapter') return chapterText(b.content.chapters[S.chapter] || {});
+  return b.content.chapters.map(chapterText).join('\n');
+}
+function localSummary(text) {
+  const sents = text.split(/(?<=[。！？!?；;])\s*/).flatMap(x => x.split('\n')).map(s => s.trim()).filter(s => s.length >= 10 && s.length <= 240);
+  if (sents.length <= 3) return { sentences: sents, total: text.length, n: sents.length };
+  const stop = new Set('的了和是就都而及与著或一个我们你们他们这那也又很更最在把被从对为之'.split(''));
+  const stoks = sents.map(s => {
+    const arr = [];
+    const c = s.match(/[\u4e00-\u9fff]/g) || [];
+    for (let i = 0; i < c.length - 1; i++) { if (!stop.has(c[i]) && !stop.has(c[i + 1])) arr.push(c[i] + c[i + 1]); }
+    (s.toLowerCase().match(/[a-z0-9]{2,}/g) || []).forEach(w => arr.push(w));
+    return arr;
+  });
+  const df = {};
+  stoks.forEach(ts => new Set(ts).forEach(t => df[t] = (df[t] || 0) + 1));
+  const N = sents.length;
+  const score = i => stoks[i].reduce((acc, t) => acc + Math.log(1 + N / (df[t] || 1)), 0) / Math.sqrt(stoks[i].length || 1);
+  const K = Math.max(4, Math.min(12, Math.round(N * 0.12)));
+  const pick = sents.map((_, i) => i).sort((a, b) => score(b) - score(a)).slice(0, K).sort((a, b) => a - b);
+  return { sentences: pick.map(i => sents[i]), total: text.length, n: N };
+}
+function retrieve(q, scope) {
+  const ids = scope === 'all' ? S.books.map(b => b.id) : [S.current && S.current.id].filter(Boolean);
+  const paras = [];
+  for (const b of S.books) {
+    if (!ids.includes(b.id)) continue;
+    b.content.chapters.forEach((ch, ci) => ch.blocks.forEach(bl => {
+      const t = (bl.type === 'ul' || bl.type === 'ol') ? (bl.items || []).join(' ') : bl.text;
+      if (t && t.length >= 20 && t.length <= 2000) paras.push({ ref: b.title + ' · ' + ch.title, text: t, tokens: tok(t) });
+    }));
+  }
+  const qts = tok(q);
+  const df = {}; const N = paras.length;
+  paras.forEach(p => { p.tset = new Set(p.tokens); p.tset.forEach(t => df[t] = (df[t] || 0) + 1); });
+  const idf = t => Math.log(1 + N / ((df[t] || 1)));
+  paras.forEach(p => { p.score = qts.reduce((acc, t) => acc + (p.tset.has(t) ? idf(t) : 0), 0); });
+  return paras.filter(p => p.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+}
+async function llmChat(messages, maxTokens = 1200) {
+  const cfg = getLLM();
+  if (!cfg.enabled || !cfg.baseURL || !cfg.apiKey || !cfg.model) return null;
+  const res = await fetch(cfg.baseURL.replace(/\/+$/, '') + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+    body: JSON.stringify({ model: cfg.model, messages, max_tokens: maxTokens, temperature: 0.4 })
+  });
+  if (!res.ok) throw new Error('LLM 接口返回 ' + res.status);
+  const j = await res.json();
+  return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || null;
+}
+async function doSummary() {
+  const b = S.current; if (!b) { toast('请先打开一本书'); return; }
+  const scope = $('#ai-sum-scope').value;
+  const text = getScopeText(scope).trim();
+  if (!text) { toast('当前范围没有可解析的文本'); return; }
+  const out = $('#ai-sum-out'); aiBusy(true);
+  const cfg = getLLM();
+  if (cfg.enabled && cfg.baseURL && cfg.apiKey && cfg.model) {
+    try {
+      const cut = text.slice(0, 14000);
+      const ans = await llmChat([
+        { role: 'system', content: '你是严谨的中文阅读助手。只依据给定原文，不编造内容。' },
+        { role: 'user', content: '请为以下内容生成中文摘要：先用一句话概括主旨，再给出 3-6 条要点（每条一行，以「·」开头）。原文：\n\n' + cut }
+      ]);
+      if (ans) { out.textContent = ans; aiBusy(false); return; }
+    } catch (err) { out.innerHTML = `<h4>LLM 调用失败，已回退本地摘要</h4><span class="stat">${esc(err.message || String(err))}</span>`; }
+  }
+  const r = localSummary(text);
+  out.innerHTML = `<h4>本地抽取式摘要 · ${scope === 'chapter' ? '当前章节' : '全书'}</h4>
+    <div class="stat">总字数 ${r.total.toLocaleString()} · 句子 ${r.n} · 摘要句 ${r.sentences.length}</div>
+    <ol>${r.sentences.map(s => `<li>${esc(s)}</li>`).join('')}</ol>`;
+  aiBusy(false);
+}
+async function doQA() {
+  const q = $('#ai-q').value.trim(); if (!q) return;
+  const scope = $('#ai-qa-scope').value;
+  const out = $('#ai-qa-out'); aiBusy(true);
+  const refs = retrieve(q, scope);
+  if (!refs.length) {
+    out.innerHTML = `<div class="ai-hint">未检索到相关段落，换个问法试试（当前范围：${scope === 'all' ? '全部书库' : '当前书'}）。</div>`;
+    aiBusy(false); return;
+  }
+  const cfg = getLLM();
+  if (cfg.enabled && cfg.baseURL && cfg.apiKey && cfg.model) {
+    try {
+      const ctx = refs.map((r, i) => '【' + (i + 1) + '】' + r.text.slice(0, 600)).join('\n\n').slice(0, 12000);
+      const ans = await llmChat([
+        { role: 'system', content: '你是严谨的中文阅读助手。只依据给定原文段落回答；若原文不足以回答，请明确说明。引用时标注【序号】。' },
+        { role: 'user', content: '原文段落：\n' + ctx + '\n\n问题：' + q }
+      ]);
+      if (ans) {
+        out.textContent = ans;
+        out.insertAdjacentHTML('beforeend', '<h4>依据 REFERENCES</h4>' + refs.map((r, i) => `<div class="ref-item"><b>【${i + 1}】${esc(r.ref)}</b>${esc(r.text.slice(0, 160))}…</div>`).join(''));
+        aiBusy(false); return;
+      }
+    } catch (err) { out.insertAdjacentHTML('afterbegin', `<h4>LLM 调用失败，已回退本地检索</h4><span class="stat">${esc(err.message || String(err))}</span>`); }
+  }
+  out.innerHTML = `<h4>答案依据（本地检索 · Top ${refs.length}）</h4>` +
+    refs.map((r, i) => `<div class="ref-item"><b>【${i + 1}】${esc(r.ref)}</b>${esc(r.text)}</div>`).join('') +
+    `<div class="ai-hint" style="margin-top:12px">本地模式给出最相关的原文段落。接入 LLM（设置）后可获得直接生成的答案。</div>`;
+  aiBusy(false);
+}
+
+/* ================= M9 · 导出 ================= */
+function download(name, content, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: mime || 'text/plain;charset=utf-8' }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function exportMarkdown() {
+  const b = S.current; if (!b) return;
+  const anns = [...S.anns].sort((x, y) => (x.chapterIndex - y.chapterIndex) || (x.createdAt - y.createdAt));
+  let md = `# 《${b.title}》批注导出\n\n> 墨砚 Inkstone · ${new Date().toLocaleString('zh-CN')}\n> 作者：${b.author || '佚名'} · 批注 ${anns.length} 条 · 阅读进度 ${Math.round(bookPct(b) * 100)}%\n\n`;
+  if (!anns.length) { md += '_暂无批注。_\n'; }
+  else if (b.format === 'pdf') {
+    anns.forEach(a => {
+      md += `## 第 ${a.page} 页\n\n> ${a.text}\n\n`;
+      if (a.note) md += `**批注（${HL_NAMES[a.color] || a.color}）**：${a.note}\n\n`;
+    });
+  } else {
+    const byCh = {};
+    anns.forEach(a => (byCh[a.chapterIndex] = byCh[a.chapterIndex] || []).push(a));
+    Object.keys(byCh).map(Number).sort((a, b) => a - b).forEach(ci => {
+      const ch = b.content.chapters[ci] || { title: '第 ' + (ci + 1) + ' 节' };
+      md += `## ${ch.title}\n\n`;
+      byCh[ci].forEach(a => {
+        md += `> ${a.text}\n\n`;
+        md += `**批注（${HL_NAMES[a.color] || a.color} · ${new Date(a.createdAt).toLocaleDateString('zh-CN')}）**：${a.note || '（仅高亮）'}\n\n`;
+      });
+    });
+  }
+  download(b.title.replace(/[\\/:*?"<>|]/g, '_') + '_批注导出.md', md, 'text/markdown;charset=utf-8');
+  toast('已导出 Markdown（' + anns.length + ' 条批注）');
+}
+
+/* ---------- 批注总览（跨书浏览 · 筛选 · 跳转 · 批量导出） ---------- */
+let _amSel = new Set();
+function amCountByBook() {
+  const m = {}; S.allAnns.forEach(a => { m[a.bookId] = (m[a.bookId] || 0) + 1; });
+  return m;
+}
+function amFiltered() {
+  const bid = ($('#am-book') || {}).value || '';
+  const cur = $('#am-colors .cur');
+  const c = cur ? cur.dataset.c : '';
+  const nf = ($('#am-note') || {}).value || '';
+  return S.allAnns.filter(a => {
+    if (bid && a.bookId !== bid) return false;
+    if (c && a.color !== c) return false;
+    const has = !!(a.note && a.note.trim());
+    if (nf === 'yes' && !has) return false;
+    if (nf === 'no' && has) return false;
+    return true;
+  }).sort((x, y) => y.createdAt - x.createdAt);
+}
+/* 密度自检只吃「书 + 颜色」两个筛选，不受「仅没写想法的」影响 ——
+   否则一切到无想法，密度恒为 0，这条统计就没意义了。 */
+function amDensityBase() {
+  const bid = ($('#am-book') || {}).value || '';
+  const cur = $('#am-colors .cur');
+  const c = cur ? cur.dataset.c : '';
+  return S.allAnns.filter(a => {
+    if (bid && a.bookId !== bid) return false;
+    if (c && a.color !== c) return false;
+    return true;
+  });
+}
+/* 平均每个位置（章/页）留了几条带想法的批注。
+   这是决定 Obsidian 导出该拆多细的依据：太密就得再按主题聚合一层。
+   甜点区 3–8 条/位置，对齐「一章补 3–5 条想法」的建议。 */
+function renderAmDensity() {
+  const box = $('#am-density');
+  const list = amDensityBase();
+  if (!list.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const bid = ($('#am-book') || {}).value || '';
+  const one = bid ? S.books.find(x => x.id === bid) : null;
+  const unit = one ? (one.format === 'pdf' ? '页' : '章') : '章·页';
+  const pos = new Set(); const notedByPos = {}; let noted = 0;
+  list.forEach(a => {
+    const b = S.books.find(x => x.id === a.bookId);
+    const k = a.bookId + '|' + (b && b.format === 'pdf' ? 'p' + (a.page || 1) : 'c' + a.chapterIndex);
+    pos.add(k);
+    if (a.note && a.note.trim()) { noted++; notedByPos[k] = (notedByPos[k] || 0) + 1; }
+  });
+  const nPos = pos.size;
+  const perN = noted / nPos;
+  const all = (list.length / nPos).toFixed(1);   /* 保留一位小数，读数整齐 */
+  const per = perN.toFixed(1);
+  const dense = Object.values(notedByPos).filter(v => v > 8).length;
+  const MAX = 16, ZONE = [3, 8];
+  const pctOf = v => Math.min(100, (v / MAX) * 100);
+  let cls, label, tip;
+  if (noted === 0) {
+    cls = 'lo'; label = '未落笔';
+    tip = `这些${unit}都只划了线、还没写想法。<span class="link" data-am-note="no">看看是哪些</span> —— 划完补一句，回头才想得起来为什么划。`;
+  } else if (perN < ZONE[0]) {
+    cls = 'lo'; label = '偏稀';
+    tip = `带想法的只有 <b>${per}</b> 条/${unit}，低于 3 条时导出的笔记偏薄。挑最触动的几条补一句想法，收益最大。`;
+  } else if (perN <= ZONE[1]) {
+    cls = 'ok'; label = '适中';
+    tip = `带想法 <b>${per}</b> 条/${unit}，密度正好。Obsidian 按${unit}导出就够用，不用再按主题拆细。`;
+  } else {
+    cls = 'hi'; label = '偏密';
+    tip = `带想法 <b>${per}</b> 条/${unit}，其中 <b>${dense}</b> 个${unit}超过 8 条。导出的单${unit}笔记会很长，建议范围选「仅文字批注」，或只勾几条再导出。`;
+  }
+  box.innerHTML =
+    `<div class="am-den-top">
+      <span>密度自检</span><span class="tag ${cls}">${label}</span><span class="sep">|</span>
+      <span>平均 <b>${all}</b> 条/${unit}</span><span class="sep">·</span>
+      <span>带想法 <b>${per}</b> 条/${unit}</span><span class="sep">·</span>
+      <span>覆盖 <b>${nPos}</b> ${unit}</span>
+    </div>
+    <div class="am-den-bar">
+      <div class="am-den-zone" style="left:${pctOf(ZONE[0])}%;width:${pctOf(ZONE[1]) - pctOf(ZONE[0])}%"></div>
+      <div class="am-den-cur" style="left:calc(${pctOf(perN)}% - 1px)"></div>
+    </div>
+    <div class="am-den-ticks"><span>0</span><span>3</span><span>8</span><span>16+</span></div>
+    <div class="am-den-tip">${tip}</div>`;
+  const lk = box.querySelector('[data-am-note]');
+  if (lk) lk.addEventListener('click', () => {
+    $('#am-note').value = lk.dataset.amNote;
+    $('#am-note').dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+function annWhere(a, b) {
+  if (!b) return '第 ' + (a.chapterIndex + 1) + ' 节';
+  if (b.format === 'pdf') return '第 ' + (a.page || 1) + ' 页';
+  const ch = b.content.chapters[a.chapterIndex];
+  return ch ? ch.title : '第 ' + (a.chapterIndex + 1) + ' 节';
+}
+function updateAmSel() {
+  const ids = new Set(amFiltered().map(a => a.id));
+  const n = [..._amSel].filter(id => ids.has(id)).length;
+  $('#am-sel').textContent = n ? '已选 ' + n + ' 条' : '点条目跳回原文 · 勾选可批量导出';
+}
+function renderAnnsOverview() {
+  const list = amFiltered();
+  $('#am-count').textContent = list.length + ' 条';
+  renderAmDensity();
+  const byBook = {};
+  list.forEach(a => (byBook[a.bookId] = byBook[a.bookId] || []).push(a));
+  $('#am-list').innerHTML = list.length ? Object.keys(byBook).map(bid => {
+    const b = S.books.find(x => x.id === bid);
+    return `<div class="am-group">《${esc((b && b.title) || '已删除的书')}》 · ${byBook[bid].length} 条</div>` +
+      byBook[bid].map(a => `<div class="am-item" data-aid="${a.id}">
+        <input type="checkbox" class="pick" data-pick="${a.id}" ${_amSel.has(a.id) ? 'checked' : ''}>
+        <div class="body">
+          <div class="where"><span class="chip c-${a.color}${(a.type === 'underline' ? ' u' : '')}"></span>${esc(annWhere(a, b))} · ${new Date(a.createdAt).toLocaleDateString('zh-CN')}</div>
+          <div class="q">${esc(a.text || '')}</div>
+          ${a.note ? `<div class="n">${esc(a.note)}</div>` : ''}
+        </div>
+      </div>`).join('');
+  }).join('') : `<div class="am-empty">没有符合条件的批注<br>换个筛选，或先去读会儿书</div>`;
+  updateAmSel();
+}
+function openAnnsModal() {
+  const counts = amCountByBook();
+  $('#am-book').innerHTML = `<option value="">全部书 · ${S.allAnns.length} 条</option>` +
+    S.books.filter(b => counts[b.id]).map(b => `<option value="${b.id}">《${esc(b.title)}》 · ${counts[b.id]} 条</option>`).join('');
+  renderAnnsOverview();
+  openModal('anns-modal');
+}
+function exportSelectedAnns() {
+  const list = amFiltered().filter(a => _amSel.has(a.id));
+  if (!list.length) { toast('还没勾选任何批注'); return; }
+  const byBook = {};
+  list.forEach(a => (byBook[a.bookId] = byBook[a.bookId] || []).push(a));
+  let md = `# 墨砚 · 批注精选\n\n> ${new Date().toLocaleString('zh-CN')} · 共 ${list.length} 条 · 来自 ${Object.keys(byBook).length} 本书\n`;
+  Object.keys(byBook).forEach(bid => {
+    const b = S.books.find(x => x.id === bid);
+    const isPdf = b && b.format === 'pdf';
+    md += `\n## 《${(b && b.title) || '已删除的书'}》\n`;
+    byBook[bid].sort((x, y) => isPdf ? ((x.page || 1) - (y.page || 1)) : (x.chapterIndex - y.chapterIndex)).forEach(a => {
+      md += `\n### ${annWhere(a, b)}\n\n> ${a.text || ''}\n\n`;
+      if (a.note) md += `**${HL_NAMES[a.color] || a.color}**：${a.note}\n\n`;
+    });
+  });
+  download('墨砚_批注精选_' + new Date().toISOString().slice(0, 10) + '.md', md, 'text/markdown;charset=utf-8');
+  toast('已导出 ' + list.length + ' 条批注');
+}
+
+/* ---------- 极简 ZIP writer（store 模式 · 零依赖 · 离线可用） ---------- */
+const _crcT = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[i] = c >>> 0; }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = _crcT[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function dosDateTime(d) {
+  return {
+    date: ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
+    time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)
+  };
+}
+/* files: [{name, data:string|Uint8Array}] → Blob(zip)，UTF-8 文件名（flag 0x0800） */
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const { date, time } = dosDateTime(new Date());
+  const locals = [], centrals = [], entries = [];
+  let offset = 0;
+  for (const f of files) {
+    const nameB = enc.encode(f.name);
+    const dataB = typeof f.data === 'string' ? enc.encode(f.data) : f.data;
+    const crc = crc32(dataB), size = dataB.length;
+    const lh = new Uint8Array(30 + nameB.length);
+    const dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true); dv.setUint16(8, 0, true);
+    dv.setUint16(10, time, true); dv.setUint16(12, date, true);
+    dv.setUint32(14, crc, true); dv.setUint32(18, size, true); dv.setUint32(22, size, true);
+    dv.setUint16(26, nameB.length, true); dv.setUint16(28, 0, true);
+    lh.set(nameB, 30);
+    locals.push(lh, dataB);
+    entries.push({ name: nameB, crc, size, offset });
+    offset += lh.length + size;
+  }
+  const cdStart = offset; let cdSize = 0;
+  for (const e of entries) {
+    const ch = new Uint8Array(46 + e.name.length);
+    const dv = new DataView(ch.buffer);
+    dv.setUint32(0, 0x02014b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 20, true);
+    dv.setUint16(8, 0x0800, true); dv.setUint16(10, 0, true);
+    dv.setUint16(12, time, true); dv.setUint16(14, date, true);
+    dv.setUint32(16, e.crc, true); dv.setUint32(20, e.size, true); dv.setUint32(24, e.size, true);
+    dv.setUint16(28, e.name.length, true); dv.setUint16(30, 0, true); dv.setUint16(32, 0, true);
+    dv.setUint16(34, 0, true); dv.setUint16(36, 0, true); dv.setUint32(38, 0, true);
+    dv.setUint32(42, e.offset, true);
+    ch.set(e.name, 46);
+    centrals.push(ch); cdSize += ch.length;
+  }
+  const eocd = new Uint8Array(22);
+  const dv2 = new DataView(eocd.buffer);
+  dv2.setUint32(0, 0x06054b50, true);
+  dv2.setUint16(8, entries.length, true); dv2.setUint16(10, entries.length, true);
+  dv2.setUint32(12, cdSize, true); dv2.setUint32(16, cdStart, true);
+  return new Blob([...locals, ...centrals, eocd], { type: 'application/zip' });
+}
+
+/* ---------- M9b · Obsidian 反向链接导出 ---------- */
+/* Obsidian 文件名/双链中非法字符需剔除：\ / : * ? " < > | # ^ [ ] */
+function obsSafe(s) { return String(s || '').replace(/[\\/:*?"<>|#^[\]]/g, '').replace(/\s+/g, ' ').trim() || '未命名'; }
+function annBlockId(a) { return 'ink-' + String(a.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toLowerCase(); }
+function yamlStr(s) { return '"' + String(s == null ? '' : s).replace(/"/g, '\\"') + '"'; }
+
+/* 单条批注的 Obsidian 块（带 ^block-id，可被 ![[文件#^id]] 引用） */
+function annBlock(a) {
+  const color = HL_NAMES[a.color] || a.color;
+  const date = new Date(a.createdAt).toLocaleDateString('zh-CN');
+  const head = a.type === 'pagenote' ? `第 ${a.page} 页` : '';
+  let s = `\n### ${head || color} · ${date}\n\n`;
+  if (a.text) s += `> ${a.text}\n`;
+  if (a.note) s += `\n${a.note}\n`;
+  else s += `\n_（${color}高亮，无批注文字）_\n`;
+  s += `^${annBlockId(a)}\n`;
+  return s;
+}
+
+/* 生成 Obsidian 笔记文件列表
+   opts: { scope:'all'|'highlight'|'note', yaml:boolean } */
+function buildObsidianFiles(b, opts) {
+  const scope = opts.scope || 'all', useYaml = opts.yaml !== false;
+  const anns = S.allAnns.filter(a => a.bookId === b.id)
+    .sort((x, y) => (x.chapterIndex - y.chapterIndex) || (x.createdAt - y.createdAt));
+  const picked = scope === 'note' ? anns.filter(a => (a.note || '').trim()) : anns;
+  const safeTitle = obsSafe(b.title);
+  const pct = Math.round(bookPct(b) * 100);
+  const files = [];
+  const fm = (pairs) => useYaml ? '---\n' + pairs.map(([k, v]) => `${k}: ${v}`).join('\n') + '\n---\n\n' : '';
+
+  /* PDF 若无书签（也就没有真实章节结构）：单文件，主笔记即正文，页级批注按页罗列。
+     有书签的 PDF 已按章切分，让它走下方与 EPUB 相同的多文件路径，获得真正的反向链接 */
+  if (b.format === 'pdf' && !(b.content.toc && b.content.toc.length)) {
+    /* 单文件：正文与批注同处一文件 */
+    let md = fm([
+      ['title', yamlStr('《' + b.title + '》')],
+      ['author', yamlStr(b.author || '佚名')],
+      ['source', '墨砚 Inkstone'],
+      ['format', 'pdf'],
+      ['pages', b.content.pageCount || '?'],
+      ['progress', pct + '%'],
+      ['annotations', picked.length],
+      ['inkstone-id', b.id],
+      ['exported', new Date().toISOString().slice(0, 10)],
+      ['tags', '\n  - 墨砚\n  - 阅读']
+    ]);
+    md += `# 《${b.title}》\n\n`;
+    md += `**作者** ${b.author || '佚名'} · **格式** PDF · **页数** ${b.content.pageCount || '?'} · **进度** ${pct}%\n\n`;
+    md += `↑ 由 [[墨砚书库]] 导出\n\n`;
+    md += `## 批注（${picked.length} 条）\n`;
+    if (!picked.length) md += '\n_暂无批注。_\n';
+    else picked.forEach(a => { md += annBlock(a); });
+    md += `\n## 原文摘录\n`;
+    if (scope === 'all' && b.content.chapters && b.content.chapters.length) {
+      const txt = chapterText(b.content.chapters[0]).slice(0, 6000);
+      md += `\n${txt}\n`;
+    }
+    files.push({ name: safeTitle + '.md', data: md });
+    return files;
+  }
+
+  /* EPUB / TXT / MD：主笔记 + 每章一个文件 → 真正的反向链接图谱 */
+  const chapters = b.content.chapters || [];
+  const byCh = {};
+  picked.forEach(a => { const k = a.chapterIndex || 0; (byCh[k] = byCh[k] || []).push(a); });
+
+  const chapFiles = [];
+  chapters.forEach((ch, ci) => {
+    const as = byCh[ci] || [];
+    if (scope !== 'all' && !as.length) return;   // 非"全部"范围：跳过无批注章节
+    const chName = obsSafe(ch.title || ('第 ' + (ci + 1) + ' 节'));
+    let md = fm([
+      ['title', yamlStr(ch.title || chName)],
+      ['book', yamlStr('[[' + safeTitle + ']]')],
+      ['source', '墨砚 Inkstone'],
+      ['chapter', ci + 1],
+      ['annotations', as.length],
+      ['inkstone-ann-id', as.length ? as[0].id : ''],
+      ['exported', new Date().toISOString().slice(0, 10)],
+      ['tags', '\n  - 墨砚/章节']
+    ]);
+    md += `# ${ch.title || chName}\n\n`;
+    md += `↑ 属于 [[${safeTitle}]]\n\n`;
+    /* PDF 章节带页码区间，便于回原书定位 */
+    if (ch.pageStart != null) md += `**页码** 第 ${ch.pageStart}${ch.pageEnd > ch.pageStart ? '–' + ch.pageEnd : ''} 页\n\n`;
+    md += `## 批注（${as.length} 条）\n`;
+    if (!as.length) md += '\n_本章暂无批注。_\n';
+    else as.forEach(a => { md += annBlock(a); });
+    if (scope === 'all') {
+      const txt = chapterText(ch).slice(0, 8000);
+      if (txt.trim()) md += `\n## 原文\n\n${txt}\n`;
+    }
+    chapFiles.push({ name: safeTitle + '/' + chName + '.md', data: md });
+  });
+
+  /* 主笔记：YAML + 章节双链目录 + 用块引用嵌入全部批注 */
+  let main = fm([
+    ['title', yamlStr('《' + b.title + '》')],
+    ['author', yamlStr(b.author || '佚名')],
+    ['source', '墨砚 Inkstone'],
+    ['format', b.format],
+    ['progress', pct + '%'],
+    ['annotations', picked.length],
+    ['chapters', chapters.length],
+    ['inkstone-id', b.id],
+    ['exported', new Date().toISOString().slice(0, 10)],
+    ['tags', '\n  - 墨砚\n  - 阅读']
+  ]);
+  main += `# 《${b.title}》\n\n`;
+  main += `**作者** ${b.author || '佚名'} · **格式** ${b.format.toUpperCase()} · **进度** ${pct}% · **批注** ${picked.length} 条\n\n`;
+  main += `> [!info] 由墨砚 Inkstone 导出\n> 每条批注在所属章节文件中带块 ID（形如 章节名#^ink-XXXX），主笔记以块引用嵌入，可在图谱中双向跳转\n\n`;
+  main += `## 章节\n\n`;
+  if (!chapFiles.length) main += '_（所选范围内无内容）_\n';
+  else chapters.forEach((ch, ci) => {
+    const as = byCh[ci] || [];
+    if (scope !== 'all' && !as.length) return;
+    const chName = obsSafe(ch.title || ('第 ' + (ci + 1) + ' 节'));
+    main += `- [[${safeTitle}/${chName}|${ch.title || chName}]]${as.length ? ' · ' + as.length + ' 条批注' : ''}\n`;
+  });
+  main += `\n## 全部批注（块引用嵌入）\n`;
+  if (!picked.length) main += '\n_暂无批注。_\n';
+  else picked.forEach(a => {
+    const ch = chapters[a.chapterIndex] || {};
+    const chName = obsSafe(ch.title || ('第 ' + ((a.chapterIndex || 0) + 1) + ' 节'));
+    main += `\n> [!quote] ${ch.title || chName}\n`;
+    main += `![[${safeTitle}/${chName}#^${annBlockId(a)}]]\n`;
+  });
+  files.push({ name: safeTitle + '.md', data: main });
+  files.push(...chapFiles);
+  return files;
+}
+
+async function exportObsidian() {
+  const b = S.current; if (!b) return;
+  const scope = ($('#obs-scope') || {}).value || 'all';
+  const yaml = !$('#obs-yaml') || $('#obs-yaml').checked;
+  const files = buildObsidianFiles(b, { scope, yaml });
+  if (!files.length) { toast('所选范围内没有可导出内容'); return; }
+  const blob = zipStore(files);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = obsSafe(b.title) + '_Obsidian.zip';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  const n = S.allAnns.filter(x => x.bookId === b.id).length;
+  closeModal('export-modal');
+  toast(`已导出 Obsidian 笔记：${files.length} 个文件 · ${n} 条批注`);
+}
+
+/* ================= M10 · 阅读计时 ================= */
+setInterval(async () => {
+  if (!S.current || $('#view-reader').hidden || document.visibilityState !== 'visible') return;
+  const b = S.current;
+  const wk = weekKeyOf(Date.now());
+  if (b.weekKey !== wk) { b.weekKey = wk; b.readMsWeek = 0; }
+  b.readMs += 10000; b.readMsWeek += 10000;
+  if (b.readMs % 30000 === 0) await dbPut('books', b);
+}, 10000);
+
+/* ================= M11 · 数据保全（备份 / 恢复） ================= */
+/* Blob 不能直接进 JSON，需与 base64 互转；分块避免大文件栈溢出 */
+async function blobToB64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let out = '';
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) out += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(out);
+}
+function b64ToBlob(b64, type) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: type || '' });
+}
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
+
+/* mode: 'light' = 仅元数据+批注（救核心资产，体积最小）
+        'full'  = 元数据+正文内容+原文件（100% 还原） */
+async function exportBackup(mode) {
+  const full = mode === 'full';
+  const books = [];
+  for (const b of S.books) {
+    const rec = Object.assign({}, b);
+    delete rec.blob;
+    if (full) {
+      if (b.blob) {
+        try { rec.blobB64 = await blobToB64(b.blob); rec.blobType = b.blob.type || ''; }
+        catch (e) { rec.blobB64 = null; }
+      }
+    } else {
+      delete rec.content;               // 轻量档不存正文，体积最小
+      rec.chapterTitles = (b.content && b.content.chapters || []).map(c => c.title);
+    }
+    books.push(rec);
+  }
+  const payload = {
+    app: 'inkstone', version: 1, mode, exportedAt: new Date().toISOString(),
+    counts: { books: books.length, anns: S.allAnns.length },
+    books, anns: S.allAnns
+  };
+  const json = JSON.stringify(payload);
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+  download(`墨砚备份_${full ? '完整' : '批注'}_${stamp}.json`, json, 'application/json;charset=utf-8');
+  toast(`已导出${full ? '完整' : '批注'}备份：${books.length} 本 / ${S.allAnns.length} 条批注 · ${fmtBytes(new Blob([json]).size)}`);
+  try { localStorage.setItem('inkstone.lastBackup', String(Date.now())); renderBackupHint(); } catch (e) {}
+}
+
+async function restoreBackup(file) {
+  let obj;
+  try { obj = JSON.parse(await file.text()); }
+  catch (e) { toast('备份文件解析失败：不是合法 JSON'); return; }
+  if (!obj || obj.app !== 'inkstone' || !Array.isArray(obj.anns)) { toast('这不是墨砚备份文件'); return; }
+
+  const existB = new Set(S.books.map(b => b.id));
+  const existA = new Set(S.allAnns.map(a => a.id));
+  let addB = 0, fixB = 0, addA = 0, skipA = 0;
+
+  for (const raw of (obj.books || [])) {
+    const rec = Object.assign({}, raw);
+    if (rec.blobB64) { try { rec.blob = b64ToBlob(rec.blobB64, rec.blobType); } catch (e) { rec.blob = null; } delete rec.blobB64; delete rec.blobType; }
+    if (!rec.blob) rec.blob = null;
+    if (!rec.content) rec.content = { chapters: [] };
+    if (existB.has(rec.id)) {
+      // 已存在同名书籍：只补齐缺失的正文/原文件，不覆盖现有阅读进度
+      const old = S.books.find(x => x.id === rec.id);
+      let dirty = false;
+      if ((!old.content || !old.content.chapters || !old.content.chapters.length) && rec.content.chapters.length) { old.content = rec.content; dirty = true; }
+      if (!old.blob && rec.blob) { old.blob = rec.blob; dirty = true; }
+      if (dirty) { await dbPut('books', old); fixB++; }
+    } else {
+      await dbPut('books', rec); S.books.push(rec); addB++;
+    }
+  }
+  for (const a of obj.anns) {
+    if (existA.has(a.id)) { skipA++; continue; }
+    await dbPut('anns', a); S.allAnns.push(a); addA++;
+  }
+  if (S.current) S.anns = S.allAnns.filter(a => a.bookId === S.current.id);
+  renderLibrary();
+  const parts = [`恢复完成：新增 ${addB} 本书`];
+  if (fixB) parts.push(`补全 ${fixB} 本`);
+  parts.push(`新增批注 ${addA} 条`);
+  if (skipA) parts.push(`跳过重复 ${skipA} 条`);
+  toast(parts.join(' · '));
+  try { localStorage.setItem('inkstone.lastBackup', String(Date.now())); renderBackupHint(); } catch (e) {}
+}
+
+/* 书架顶部提示：从未备份过 或 超过 14 天未备份且有批注 → 提醒 */
+function renderBackupHint() {
+  const el = $('#backup-hint'); if (!el) return;
+  let last = 0;
+  try { last = parseInt(localStorage.getItem('inkstone.lastBackup') || '0', 10); } catch (e) {}
+  const days = last ? Math.floor((Date.now() - last) / 86400000) : -1;
+  const need = S.allAnns.length > 0 && (days === -1 || days >= 14);
+  el.hidden = !need;
+  if (need) el.textContent = days === -1
+    ? `你的 ${S.allAnns.length} 条批注只存在这台设备的浏览器里，尚未备份 · 点此备份`
+    : `距上次备份已 ${days} 天，${S.allAnns.length} 条批注建议再备份一次 · 点此备份`;
+}
+function closeModal(id) { $('#' + id).classList.add('closing'); $('#' + id).hidden = true; }
+function openModal(id) { $('#' + id).hidden = false; }
+document.addEventListener('click', e => {
+  const cm = e.target.closest('[data-close-modal]');
+  if (cm) { closeModal(cm.dataset.closeModal); return; }
+  const cx = e.target.closest('[data-close]');
+  if (cx) { $('#' + cx.dataset.close).classList.remove('open'); return; }
+  if (e.target.classList.contains('modal-mask')) { e.target.hidden = true; return; }
+});
+
+/* ================= 选区批注交互 ================= */
+let _noteState = null; // {mode:'new', text} | {mode:'edit', ann}
+document.addEventListener('mouseup', e => {
+  const pop = $('#sel-pop');
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) { pop.hidden = true; return; }
+  /* PDF 现在有文本层，同样支持划词；EPUB/TXT/MD 走原路径 */
+  const inPdf = !!(S.current && S.current.format === 'pdf' && $('#pdf-text-layer').contains(sel.anchorNode));
+  if (!inPdf && !$('#reader-content').contains(sel.anchorNode)) { pop.hidden = true; return; }
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  pop.hidden = false;
+  const pw = pop.offsetWidth || 220, ph = pop.offsetHeight || 36;
+  pop.style.left = Math.max(8, Math.min(window.innerWidth - pw - 8, rect.left + rect.width / 2 - pw / 2)) + 'px';
+  pop.style.top = Math.max(8, rect.top - ph - 10) + 'px';
+});
+$('#sel-pop').addEventListener('mousedown', e => e.preventDefault());
+$('#sel-pop').addEventListener('click', e => {
+  const sw = e.target.closest('.sw'), ub = e.target.closest('.u-btn'), nb = e.target.closest('.n-btn');
+  const sb = e.target.closest('.s-btn');
+  if (sw) { addAnnotation(sw.dataset.color, 'highlight', ''); return; }
+  if (ub) { addAnnotation(null, 'underline', ''); return; }
+  if (nb) {
+    const s = captureSel(); if (!s) return;
+    _noteState = { mode: 'new', text: s.text, color: 'cinnabar' };
+    openNoteModal(null, s.text);
+    return;
+  }
+  /* 划词检索：拿选中文字直接跨书搜索（PDF 文本层已归一化，可直接命中正文） */
+  if (sb) {
+    const s = captureSel(); if (!s) return;
+    $('#sel-pop').hidden = true;
+    openModal('search-modal');
+    $('#search-input').value = s.text;
+    runSearch();
+  }
+});
+function openNoteModal(ann, quote) {
+  $('#note-quote').textContent = quote || '';
+  $('#note-text').value = ann ? (ann.note || '') : '';
+  $('#note-del').hidden = !ann;
+  $$('#note-colors .c').forEach(c => c.classList.toggle('sel', ann ? c.dataset.color === ann.color : c.dataset.color === 'cinnabar'));
+  openModal('note-modal');
+  setTimeout(() => $('#note-text').focus(), 60);
+}
+$('#note-colors').addEventListener('click', e => {
+  const c = e.target.closest('.c'); if (!c) return;
+  $$('#note-colors .c').forEach(x => x.classList.remove('sel'));
+  c.classList.add('sel');
+});
+$('#note-save').addEventListener('click', async () => {
+  const selEl = $$('#note-colors .c.sel')[0];
+  const color = selEl ? selEl.dataset.color : 'cinnabar';
+  const note = $('#note-text').value.trim();
+  if (!_noteState) { closeModal('note-modal'); return; }
+  if (_noteState.mode === 'pagenote') {
+    await addAnnotation(color, 'pagenote', note, '第 ' + S.pdfPage + ' 页 · 页级批注');
+    closeModal('note-modal'); _noteState = null; return;
+  }
+  if (_noteState.mode === 'edit') {
+    const a = _noteState.ann;
+    a.note = note; a.color = color;
+    await dbPut('anns', a);
+    if (S.current && a.bookId === S.current.id) {
+      const i = S.anns.findIndex(x => x.id === a.id); if (i >= 0) S.anns[i] = a;
+      /* PDF 走 applyPdfMarks，否则改了颜色画面上的高亮不会变 */
+      if (S.current.format !== 'pdf') renderChapter(S.chapter);
+      else applyPdfMarks();
+      renderAnnotSidebar();
+    }
+  } else if (_noteState) {
+    await addAnnotation(color, 'highlight', note, _noteState.text);
+  }
+  closeModal('note-modal'); _noteState = null;
+});
+$('#note-del').addEventListener('click', async () => {
+  if (_noteState && _noteState.mode === 'edit') { const id = _noteState.ann.id; closeModal('note-modal'); _noteState = null; await deleteAnn(id); }
+});
+/* 批注侧栏操作 */
+$('#ann-list').addEventListener('click', e => {
+  const item = e.target.closest('.ann-item'); if (!item) return;
+  const id = item.dataset.aid;
+  const op = e.target.closest('[data-op]');
+  const ann = S.anns.find(a => a.id === id); if (!ann) return;
+  if (!op) { jumpToAnn(ann); return; }
+  if (op.dataset.op === 'jump') jumpToAnn(ann);
+  if (op.dataset.op === 'del') deleteAnn(id);
+  if (op.dataset.op === 'edit') { _noteState = { mode: 'edit', ann }; openNoteModal(ann, ann.text); }
+});
+/* mark 点击（查看已有批注） */
+$('#reader-content').addEventListener('click', e => {
+  const m = e.target.closest('mark.hl');
+  if (m && m.dataset.aid) {
+    const ann = S.anns.find(a => a.id === m.dataset.aid);
+    if (ann) { _noteState = { mode: 'edit', ann }; openNoteModal(ann, ann.text); }
+  }
+});
+
+/* ================= 检索交互 ================= */
+$('#search-input').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+$('#search-input').addEventListener('input', debounce(() => runSearch(), 300));
+$$('.sr-tabs button').forEach(b => b.addEventListener('click', () => {
+  $$('.sr-tabs button').forEach(x => x.classList.remove('cur'));
+  b.classList.add('cur'); _srTab = b.dataset.st; runSearch();
+}));
+$('#search-results').addEventListener('click', async e => {
+  const it = e.target.closest('.sr-item'); if (!it || !it.dataset.jump) return;
+  if (_srTab === 'ann') {
+    const a = S.allAnns.find(x => x.id === it.dataset.jump);
+    if (a) { closeModal('search-modal'); await jumpToAnn(a); }
+  } else {
+    const [bid, ci, q] = it.dataset.jump.split('|');
+    await jumpToResult(bid, +ci, q);
+  }
+});
+
+/* ================= 面板 / 工具栏交互 ================= */
+function toggleDrawer(id) { $('#' + id).classList.toggle('open'); }
+$('#btn-back').addEventListener('click', closeReader);
+$('#btn-toc').addEventListener('click', () => toggleDrawer('toc-drawer'));
+$('#btn-annot').addEventListener('click', () => toggleDrawer('annot-panel'));
+$('#btn-ai').addEventListener('click', () => toggleDrawer('ai-panel'));
+$('#btn-speak').addEventListener('click', toggleSpeak);
+$('#btn-export').addEventListener('click', () => {
+  if (!S.current) return;
+  $('#exp-target').value = 'obsidian';
+  $('#obs-opts').hidden = false;
+  openModal('export-modal');
+});
+$('#exp-target').addEventListener('change', e => { $('#obs-opts').hidden = e.target.value !== 'obsidian'; });
+$('#exp-go').addEventListener('click', () => {
+  if ($('#exp-target').value === 'obsidian') exportObsidian();
+  else { exportMarkdown(); closeModal('export-modal'); }
+});
+$('#btn-typo').addEventListener('click', () => { $('#typo-pop').hidden = !$('#typo-pop').hidden; });
+$('#toc-list').addEventListener('click', e => {
+  const a = e.target.closest('a[data-i]'); if (!a) return;
+  /* 统一走 goChapter —— PDF 分支在它内部按 chapter.pageStart 跳页。
+     旧实现在此处特判 goPage(i+1)，那是「一章即一页」时代的写法，书签分组后即失效 */
+  goChapter(+a.dataset.i);
+  $('#toc-drawer').classList.remove('open');
+});
+$$('.ai-tabs button').forEach(b => b.addEventListener('click', () => {
+  $$('.ai-tabs button').forEach(x => x.classList.remove('cur'));
+  b.classList.add('cur');
+  $('#ai-pane-sum').classList.toggle('cur', b.dataset.tab === 'sum');
+  $('#ai-pane-qa').classList.toggle('cur', b.dataset.tab === 'qa');
+}));
+$('#ai-sum-btn').addEventListener('click', doSummary);
+$('#ai-qa-btn').addEventListener('click', doQA);
+$('#ai-q').addEventListener('keydown', e => { if (e.key === 'Enter') doQA(); });
+/* 排版调节 */
+$('#t-fs').addEventListener('input', e => { setPrefs({ fs: +e.target.value }); applyPrefs(); });
+$('#t-lh').addEventListener('input', e => { setPrefs({ lhIdx: +e.target.value }); applyPrefs(); });
+$('#t-para').addEventListener('input', e => { setPrefs({ paraIdx: +e.target.value }); applyPrefs(); });
+$$('#typo-pop .th').forEach(t => t.addEventListener('click', () => { setPrefs({ theme: t.dataset.th }); applyPrefs(); }));
+$$('#typo-pop .ft').forEach(t => t.addEventListener('click', () => { setPrefs({ font: t.dataset.font }); applyPrefs(); }));
+/* PDF 导航 */
+$('#pdf-prev').addEventListener('click', () => goPage(S.pdfPage - 1));
+$('#pdf-next').addEventListener('click', () => goPage(S.pdfPage + 1));
+$('#pdf-zoom-in').addEventListener('click', () => { S.pdfZoom = Math.min(2.5, S.pdfZoom + 0.15); renderPdfPage(); });
+$('#pdf-zoom-out').addEventListener('click', () => { S.pdfZoom = Math.max(0.5, S.pdfZoom - 0.15); renderPdfPage(); });
+$('#pdf-note-btn').addEventListener('click', () => {
+  if (!S.current) return;
+  _noteState = { mode: 'pagenote' };
+  $('#note-quote').textContent = '第 ' + S.pdfPage + ' 页 · 页级批注';
+  $('#note-text').value = '';
+  $('#note-del').hidden = true;
+  $$('#note-colors .c').forEach(x => x.classList.toggle('sel', x.dataset.color === 'cinnabar'));
+  openModal('note-modal');
+});
+/* 书架交互 */
+$('#btn-import').addEventListener('click', () => $('#file-input').click());
+$('#btn-import-2').addEventListener('click', () => $('#file-input').click());
+$('#file-input').addEventListener('change', e => {
+  const fs = [...e.target.files];   // 先快照：清空 value 会使 FileList 失效
+  e.target.value = '';
+  importFiles(fs);
+});
+$('#book-grid').addEventListener('click', e => {
+  const del = e.target.closest('.del');
+  if (del) { deleteBook(del.closest('.book-card').dataset.id); return; }
+  const card = e.target.closest('.book-card');
+  if (card) openBook(card.dataset.id);
+  if (e.target.closest('#import-card')) $('#file-input').click();
+});
+$('#btn-search-lib').addEventListener('click', () => { openModal('search-modal'); setTimeout(() => $('#search-input').focus(), 60); });
+/* 书架排序 / 筛选 */
+$('#lt-sort').addEventListener('change', e => { setPrefs({ libSort: e.target.value }); renderLibrary(); });
+$('#lib-tools').addEventListener('click', e => {
+  const bt = e.target.closest('[data-f]'); if (!bt) return;
+  setPrefs({ libFilter: bt.dataset.f }); renderLibrary();
+});
+/* 批注总览 */
+$('#btn-anns').addEventListener('click', () => openAnnsModal());
+$('#lib-stats').addEventListener('click', e => { if (e.target.closest('#stat-anns')) openAnnsModal(); });
+$('#am-book').addEventListener('change', renderAnnsOverview);
+$('#am-note').addEventListener('change', renderAnnsOverview);
+$('#am-colors').addEventListener('click', e => {
+  const bt = e.target.closest('[data-c]'); if (!bt) return;
+  $$('#am-colors [data-c]').forEach(x => x.classList.toggle('cur', x === bt));
+  renderAnnsOverview();
+});
+$('#am-all').addEventListener('click', () => { amFiltered().forEach(a => _amSel.add(a.id)); renderAnnsOverview(); });
+$('#am-none').addEventListener('click', () => { _amSel.clear(); renderAnnsOverview(); });
+$('#am-export').addEventListener('click', exportSelectedAnns);
+$('#am-list').addEventListener('click', async e => {
+  const pick = e.target.closest('[data-pick]');
+  if (pick) { pick.checked ? _amSel.add(pick.dataset.pick) : _amSel.delete(pick.dataset.pick); updateAmSel(); return; }
+  const item = e.target.closest('.am-item'); if (!item) return;
+  const a = S.allAnns.find(x => x.id === item.dataset.aid); if (!a) return;
+  closeModal('anns-modal');
+  await jumpToAnn(a);
+});
+$('#btn-settings').addEventListener('click', () => {
+  const c = getLLM();
+  $('#llm-baseurl').value = c.baseURL || '';
+  $('#llm-key').value = c.apiKey || '';
+  $('#llm-model').value = c.model || '';
+  $('#llm-enabled').checked = !!c.enabled;
+  openModal('settings-modal');
+});
+$('#settings-save').addEventListener('click', () => {
+  localStorage.setItem('inkstone.llm', JSON.stringify({
+    enabled: $('#llm-enabled').checked,
+    baseURL: $('#llm-baseurl').value.trim(),
+    apiKey: $('#llm-key').value.trim(),
+    model: $('#llm-model').value.trim()
+  }));
+  closeModal('settings-modal'); toast('设置已保存（仅存本机）');
+});
+/* M11 事件绑定 */
+$('#btn-backup-light').addEventListener('click', () => exportBackup('light'));
+$('#btn-backup-full').addEventListener('click', () => exportBackup('full'));
+$('#btn-restore').addEventListener('click', () => $('#backup-input').click());
+$('#backup-input').addEventListener('change', async e => {
+  const f = [...(e.target.files || [])][0];
+  e.target.value = '';
+  if (f) await restoreBackup(f);
+});
+$('#backup-hint').addEventListener('click', () => { openModal('settings-modal'); });
+
+$('#btn-clear-all').addEventListener('click', async () => {
+  if (S.allAnns.length && !confirm(`你有 ${S.allAnns.length} 条批注尚未确认备份。建议先点「导出批注备份」保存一份。\n\n仍要继续清空？`)) return;
+  if (!confirm('确认清空全部书籍与批注？此操作不可恢复！')) return;
+  if (!confirm('再次确认：真的要清空所有数据吗？')) return;
+  await dbClear('books'); await dbClear('anns');
+  S.books = []; S.allAnns = []; S.current = null;
+  closeReader(); renderLibrary(); closeModal('settings-modal');
+  toast('已清空');
+});
+/* 拖放导入 */
+document.addEventListener('dragover', e => { e.preventDefault(); });
+document.addEventListener('drop', e => { e.preventDefault(); if (!$('#view-library').hidden) importFiles([...e.dataTransfer.files]); });
+/* 阅读区滚动 → 进度保存 + 工具栏自动浮现 */
+$('#reader-stage').addEventListener('scroll', debounce(() => { if (!$('#view-reader').hidden) { saveProgress(); idleChrome(); } }, 400));
+/* 净空模式：5 秒无操作隐藏工具栏；双击切换 */
+let _idleT = null;
+function idleChrome() {
+  clearTimeout(_idleT);
+  $('#view-reader').classList.remove('chrome-hidden');
+  _idleT = setTimeout(() => {
+    if (!$('#view-reader').hidden && $('#note-modal').hidden && $('#search-modal').hidden) {
+      $('#view-reader').classList.add('chrome-hidden');
+    }
+  }, 5000);
+}
+document.addEventListener('mousemove', debounce(() => { if (!$('#view-reader').hidden) idleChrome(); }, 300));
+$('#reader-stage').addEventListener('dblclick', () => $('#view-reader').classList.toggle('chrome-hidden'));
+/* 键盘 */
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); $('#btn-search-lib').click(); return; }
+  if (e.key === 'Escape') {
+    ['note-modal', 'search-modal', 'settings-modal'].forEach(id => { if (!$('#' + id).hidden) closeModal(id); });
+    $('#typo-pop').hidden = true;
+    $$('.drawer').forEach(d => d.classList.remove('open'));
+    $('#sel-pop').hidden = true;
+    return;
+  }
+  if ($('#view-reader').hidden || e.target.closest('input,textarea,select') || e.metaKey || e.ctrlKey) return;
+  if (S.current && S.current.format === 'pdf') {
+    if (e.key === 'ArrowRight') goPage(S.pdfPage + 1);
+    if (e.key === 'ArrowLeft') goPage(S.pdfPage - 1);
+  } else {
+    if (e.key === 'ArrowRight') goChapter(S.chapter + 1);
+    if (e.key === 'ArrowLeft') goChapter(S.chapter - 1);
+  }
+});
+window.addEventListener('beforeunload', () => { try { saveProgressNow(); } catch (e) {} });
+
+/* ================= 内置样张 ================= */
+const SAMPLE_MD = `# 留白：排版与阅读的呼吸
+
+> 墨砚内置阅读样张 · 原创示例 · 可随时删除
+
+## 一、空，不是没有
+
+留白不是页面上剩下的地方，而是被刻意保留的地方。新手害怕空白，总想把每个角落填满；老手恰恰相反——他们先决定哪里不放东西。一张海报的力量，往往取决于文字周围那圈沉默的边界。
+
+阅读界面也是同理。按钮、进度条、推荐位，每多一个元素，读者的注意力就被切走一次。所谓「净空」，不是功能少，而是**在正确的时刻只呈现必要的东西**。
+
+## 二、字号与行距的暗账
+
+- 正文字号低于 16px，中文长文阅读疲劳度显著上升
+- 行距 1.6 到 1.9 之间，是中文宋体的舒适区间
+- 段与段之间的空隙，承担了「呼吸」的职能，比首行缩进更重要
+- 每行 30 到 38 字，眼睛回到行首时不易串行
+
+这些数字没有玄学，只有生理：眼球跳动一次覆盖的距离，决定了行长；睫状肌的调节频率，决定了对比度下限。
+
+## 三、给创作者的三条建议
+
+1. **先做减法**：把界面上所有元素列出来，删掉一半，剩下的才会说话。
+2. **建立层级**：主标题、次级、正文、辅助、装饰——五个明度阶梯，一眼分清。
+3. **尊重纸感**：屏幕模拟纸张的暖白（而非纯白），能让人多读二十分钟。
+
+> 好的排版是隐形的。读者感觉不到它的存在，只是一页一页地翻了下去。
+
+## 四、试试墨砚的批注
+
+选中上面任意一段文字，试试四色高亮与批注——所有标注都会进入全文检索，随时找得回来。这就是墨砚存在的理由：**让你愿意一次读两小时，读完后还找得回所有想法。**
+`;
+
+async function seedSample() {
+  const rec = makeRec({ title: '留白：排版与阅读的呼吸', author: '墨砚内置样张', format: 'md', content: { chapters: chapterizeMd(SAMPLE_MD) }, cover: makeCover('留白', '墨砚内置样张') });
+  await dbPut('books', rec); S.books.push(rec);
+}
+
+/* ================= 启动 ================= */
+(async function init() {
+  try {
+    S.books = await dbGetAll('books');
+    S.allAnns = await dbGetAll('anns');
+    if (!S.books.length) await seedSample();
+    applyPrefs();
+    renderLibrary();
+    idleChrome();
+  } catch (err) {
+    console.error(err);
+    document.body.innerHTML = '<div style="padding:60px;font-family:sans-serif">墨砚初始化失败：' + esc(err.message || String(err)) + '</div>';
+  }
+})();
+</script>
+</body>
+</html>
