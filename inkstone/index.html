@@ -566,6 +566,7 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
         <button data-st="text" class="cur" data-page-node-id="8nSWpB1gJdDql7LoA8FGcB">全文</button>
         <button data-st="ann" data-page-node-id="qIUffQ1gQ6VGzIidxET9kb">批注</button>
       </div>
+      <div id="sr-idx" class="sr-idx" hidden></div>
       <div id="search-results" data-page-node-id="NBMtW3KUM8vowr6FAA6boL"></div>
     </div>
   </div>
@@ -686,6 +687,15 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
         <input type="file" id="backup-input" accept="application/json,.json" hidden>
         <div class="note-hint" style="margin-top:8px">批注备份＝书名 + 全部批注（体积小，救回核心资产）；完整备份＝另含正文与原文件（可 100% 还原，体积大）。恢复按 ID 去重，不会覆盖现有阅读进度。</div>
       </div>
+      <div class="field"><label>检索索引（让跨书检索不卡的预处理缓存）</label>
+        <div class="stg-guard">
+          <div class="row"><span class="k">状态</span><span class="v" id="stg-sidx">—</span></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn small ghost" id="btn-sidx-rebuild">重建索引</button>
+        </div>
+        <div class="note-hint" style="margin-top:8px">导入时自动建立，之后一直复用；删书或正文变动会自动作废重建。它只是缓存，删掉不丢任何数据，最多下次检索慢一点（会自动重算）。</div>
+      </div>
       <div class="field" data-page-node-id="gjUNvPSwlbn602E5LnAfwj2"><label data-page-node-id="VMp5RaO7SalxI5VbshXzti2">危险操作</label>
         <button class="btn small ghost" id="btn-clear-all" data-page-node-id="DZpDtV9GKkQoYfAFV9BF7A" style="border-color:#c8102e;color:#c8102e">清空书架与批注</button>
       </div>
@@ -736,12 +746,15 @@ let _db = null;
 function idb() {
   if (_db) return Promise.resolve(_db);
   return new Promise((res, rej) => {
-    const r = indexedDB.open('inkstone', 1);
+    const r = indexedDB.open('inkstone', 2);
     r.onupgradeneeded = e => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('books')) db.createObjectStore('books', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('anns')) { const st = db.createObjectStore('anns', { keyPath: 'id' }); st.createIndex('bookId', 'bookId'); }
+      /* 检索索引：每章预先算好的「归一化 + 小写」正文，删掉可重建，不是用户数据 */
+      if (!db.objectStoreNames.contains('sidx')) db.createObjectStore('sidx', { keyPath: 'bookId' });
     };
+    r.onblocked = () => { console.warn('IndexedDB 升级被其他标签页阻塞'); };
     r.onsuccess = () => { _db = r.result; res(_db); };
     r.onerror = () => rej(r.error);
   });
@@ -750,6 +763,7 @@ async function dbPut(store, val) { const db = await idb(); return new Promise((r
 async function dbGetAll(store) { const db = await idb(); return new Promise((res, rej) => { const rq = db.transaction(store).objectStore(store).getAll(); rq.onsuccess = () => res(rq.result || []); rq.onerror = () => rej(rq.error); }); }
 async function dbDelete(store, id) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).delete(id); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
 async function dbClear(store) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).clear(); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+async function dbGet(store, id) { const db = await idb(); return new Promise((res, rej) => { const rq = db.transaction(store).objectStore(store).get(id); rq.onsuccess = () => res(rq.result || null); rq.onerror = () => rej(rq.error); }); }
 /* localStorage 偏好 */
 function getPrefs() { try { return JSON.parse(localStorage.getItem('inkstone.prefs')) || {}; } catch (e) { return {}; } }
 function setPrefs(patch) { const p = { ...getPrefs(), ...patch }; localStorage.setItem('inkstone.prefs', JSON.stringify(p)); return p; }
@@ -1186,6 +1200,8 @@ async function importFiles(files) {
       const dup = S.books.find(b => b.title === rec.title);
       if (dup && !confirm('书架已有《' + rec.title + '》，仍要再导入一份吗？')) continue;
       await dbPut('books', rec); S.books.push(rec);
+      /* 索引现在建好，第一次检索就不用等。失败也不影响读书，检索时会自动补建 */
+      buildBookIndex(rec).catch(() => {});
       renderLibrary();
       toast('已导入《' + rec.title + '》');
     } catch (err) {
@@ -1204,6 +1220,7 @@ async function deleteBook(id) {
   const b = S.books.find(x => x.id === id); if (!b) return;
   if (!confirm('删除《' + b.title + '》及其全部批注？此操作不可恢复。')) return;
   await dbDelete('books', id);
+  await dropSidx(id);                       // 索引是缓存，书没了它必须跟着走，否则会留孤儿记录
   S.books = S.books.filter(x => x.id !== id);
   const gone = S.allAnns.filter(a => a.bookId === id);
   for (const a of gone) await dbDelete('anns', a.id);
@@ -1978,6 +1995,114 @@ async function jumpToAnn(a) {
   }, isPdf ? 0 : 90);
 }
 
+/* ================= M7·0 · 检索索引 =================
+   旧做法：每敲一个字，都把每本书的正文重新拼一遍 → 归一化 → 转小写，再逐章 indexOf。
+   书一多（或一本大部头）主线程就被占住，输入框肉眼可见地卡，手机上是直接假死。
+   新做法：导入时把每章的「归一化 + 小写」正文预先算好存进 IndexedDB（store: sidx），
+   检索只在这份预处理文本上做一次线性 indexOf。
+   正文导入后不会变，所以索引只在导入/恢复时建一次；
+   sig（章节数 + 总字数）对不上就自动作废重建 —— 比如旧 PDF 后来补齐了章节区间。 */
+const SIDX_V = 1;
+const SIDX_CACHE_CAP = 24e6;          // 内存缓存上限 2400 万字，超了整包丢弃（数据在 IndexedDB 里，不丢）
+const _sidx = new Map();              // bookId → 索引记录（内存缓存）
+let _sidxChars = 0, _sidxJob = null;
+const SIDX_STAT = { done: 0, total: 0, building: false };
+
+/* 字数只用于算指纹，不拼接字符串，避免为了校验而制造大对象 */
+function chapterTextLen(ch) {
+  if (!ch || !Array.isArray(ch.blocks)) return 0;
+  let n = 0;
+  for (const bl of ch.blocks) {
+    if (bl.type === 'ul' || bl.type === 'ol') { for (const it of (bl.items || [])) n += (it || '').length + 1; }
+    else n += (bl.text || '').length + 1;
+  }
+  return n;
+}
+function bookSig(b) {
+  if (!b || !b.content || !Array.isArray(b.content.chapters)) return 0;
+  let n = b.content.chapters.length;
+  for (const ch of b.content.chapters) n += ((ch.title || '').length + 1) + chapterTextLen(ch);
+  return n;
+}
+function sidxOk(b, r) { return !!r && r.v === SIDX_V && r.sig === bookSig(b) && Array.isArray(r.chapters) && r.chapters.length === ((b.content && b.content.chapters) || []).length; }
+function idle(ms) { return new Promise(r => setTimeout(r, ms || 0)); }
+
+async function buildBookIndex(b) {
+  if (!b || !b.content || !Array.isArray(b.content.chapters)) return null;
+  const chapters = [];
+  let chars = 0, slice = Date.now();
+  for (let i = 0; i < b.content.chapters.length; i++) {
+    const ch = b.content.chapters[i];
+    const raw = chapterText(ch);
+    const t = normalizeCJK(ch.title || '').toLowerCase();
+    const body = normalizeCJK(raw).toLowerCase();
+    chapters.push({ t, b: body, len: raw.length });   // len = 建索引时的正文字数，用来校验偏移量还能不能用
+    chars += t.length + 1 + body.length;
+    /* 按时间切片而不是按章节数：章节再碎也不会切太勤，章节再大也不会一次占死主线程 */
+    if (Date.now() - slice > 25) { await idle(0); slice = Date.now(); }
+  }
+  const rec = { bookId: b.id, v: SIDX_V, sig: bookSig(b), chars, chapters, builtAt: Date.now() };
+  await dbPut('sidx', rec);
+  _sidx.set(b.id, rec); _sidxChars += chars;
+  if (_sidxChars > SIDX_CACHE_CAP) { _sidx.clear(); _sidxChars = 0; }
+  return rec;
+}
+async function getSidx(b) {
+  const hit = _sidx.get(b.id);
+  if (sidxOk(b, hit)) return hit;
+  let r = null;
+  try { r = await dbGet('sidx', b.id); } catch (e) { r = null; }
+  if (!sidxOk(b, r)) r = await buildBookIndex(b);
+  if (r) _sidx.set(b.id, r);
+  return r;
+}
+async function dropSidx(id) { _sidx.delete(id); try { await dbDelete('sidx', id); } catch (e) {} }
+function sidxReadyCount() { let n = 0; for (const b of S.books) if (sidxOk(b, _sidx.get(b.id))) n++; return n; }
+
+function renderSidxStatus() {
+  const el = $('#sr-idx');
+  if (el) {
+    el.hidden = !SIDX_STAT.building;
+    if (SIDX_STAT.building) el.textContent = `正在为 ${SIDX_STAT.total} 本书建立检索索引… ${SIDX_STAT.done}/${SIDX_STAT.total}（只此一次）`;
+  }
+  const st = $('#stg-sidx');
+  if (st) st.textContent = SIDX_STAT.building ? `建立中 ${SIDX_STAT.done}/${SIDX_STAT.total}` : `已索引 ${sidxReadyCount()}/${S.books.length} 本`;
+}
+/* 后台补齐索引：老版本导入的书没有索引，第一次检索前静默建好。
+   并发调用共用一个任务，不会重复建。 */
+function ensureAllIndexes() {
+  if (_sidxJob) return _sidxJob;
+  _sidxJob = (async () => {
+    const todo = [];
+    for (const b of S.books) {
+      const hit = _sidx.get(b.id);
+      if (sidxOk(b, hit)) continue;
+      let r = null;
+      try { r = await dbGet('sidx', b.id); } catch (e) { r = null; }
+      if (sidxOk(b, r)) { _sidx.set(b.id, r); continue; }
+      todo.push(b);
+    }
+    if (!todo.length) { renderSidxStatus(); return; }
+    SIDX_STAT.total = todo.length; SIDX_STAT.done = 0; SIDX_STAT.building = true;
+    renderSidxStatus();
+    for (const b of todo) {
+      await buildBookIndex(b);
+      SIDX_STAT.done++;
+      renderSidxStatus();
+      await idle(0);
+    }
+    SIDX_STAT.building = false;
+    renderSidxStatus();
+  })().catch(e => { console.warn('检索索引建立失败', e); SIDX_STAT.building = false; renderSidxStatus(); })
+    .finally(() => { _sidxJob = null; });
+  return _sidxJob;
+}
+async function rebuildAllIndexes() {
+  for (const b of S.books) { try { await dbDelete('sidx', b.id); } catch (e) {} }
+  _sidx.clear(); _sidxChars = 0;
+  await ensureAllIndexes();
+}
+
 /* ================= M7 · 检索 ================= */
 let _srTab = 'text';
 function ch0Title(b, ci) { return (b.content.chapters[ci] || {}).title || ''; }
@@ -1986,10 +2111,55 @@ function hlCtx(ctx, q) {
   if (i < 0) return esc(ctx);
   return esc(ctx.slice(0, i)) + '<b>' + esc(ctx.slice(i, i + q.length)) + '</b>' + esc(ctx.slice(i + q.length));
 }
-function runSearch() {
-  const q = normalizeCJK($('#search-input').value.trim());
+/* 在索引上找 ql。返回 {n: 命中总数, capped: 是否撞上计数上限}
+   偏移量能直接用的前提：索引里那份归一化文本的长度，和当下正文的长度一致。
+   不一致（理论上只有 toLowerCase 改变字符数才会发生）就现算一次，慢一点但不会错位。 */
+const SR_PER_BOOK = 20;    // 单本最多显示 20 条，免得一本命中极多的书把别的书挤出屏幕
+const SR_HARD = 2000;      // 计数到 2000 处就停手：像「的」这种词没必要数到底，否则反而拖慢
+function searchBookWithIndex(b, rec, ql, out, cap, pbMax) {
+  let n = 0, shown = 0, capped = false;
+  const chs = (b.content && b.content.chapters) || [];
+  const push = (ci, title, ctx) => {
+    if (out.length < cap && shown < pbMax) {
+      out.push({ bookId: b.id, bookTitle: b.title, chapterIndex: ci, chapterTitle: title, ctx });
+      shown++;
+    }
+  };
+  for (let ci = 0; ci < chs.length; ci++) {
+    const ch = chs[ci];
+    const title = ch.title || '';
+    const raw = chapterText(ch);
+    const ir = rec.chapters[ci];
+    const hay = (ir && ir.len === raw.length) ? ir.b : normalizeCJK(raw).toLowerCase();
+    const tl = ir ? ir.t : normalizeCJK(title).toLowerCase();
+    if (tl.indexOf(ql) !== -1) { n++; push(ci, title, title); }
+    let idx = 0;
+    while ((idx = hay.indexOf(ql, idx)) !== -1) {
+      n++;
+      const start = Math.max(0, idx - 40), end = Math.min(raw.length, idx + ql.length + 50);
+      push(ci, title, (start > 0 ? '…' : '') + raw.slice(start, end) + (end < raw.length ? '…' : ''));
+      idx += ql.length;
+      if (n >= SR_HARD) { capped = true; break; }
+    }
+    if (capped) break;
+  }
+  return { n, capped };
+}
+/* 检索走索引 + 异步分片：
+   ① token 防串台 —— 打字快时，旧一轮算完不许覆盖新结果
+   ② 每扫过 200 万字切出去一帧 —— 大书库也不会把输入框焊死
+   ③ 300ms 还没出结果才显示「检索中…」，正常的快检索不闪 */
+let _srToken = 0, _srCap = 200;
+async function runSearch(bump) {
   const out = $('#search-results');
-  if (!q) { out.innerHTML = ''; return; }
+  _srCap = (bump === true) ? _srCap + 200 : 200;   // 只认显式 true，别把 DOM 事件当成分页参数
+  const token = ++_srToken;
+  const q = normalizeCJK($('#search-input').value.trim());
+  if (!q) { out.innerHTML = ''; renderSidxStatus(); return; }
+  const slow = setTimeout(() => {
+    if (token === _srToken) out.innerHTML = `<div class="sr-item" style="cursor:default;color:var(--aux)">检索中…</div>`;
+  }, 300);
+  try {
   if (_srTab === 'ann') {
     const res = S.allAnns.filter(a => (a.text && a.text.includes(q)) || (a.note && a.note.includes(q)))
       .sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
@@ -2006,31 +2176,42 @@ function runSearch() {
     return;
   }
   const ql = q.toLowerCase();
+  if (!S.books.length) { out.innerHTML = `<div class="sr-item" style="cursor:default;color:var(--aux)">书库还是空的</div>`; return; }
   const results = [];
+  let total = 0, capped = false, scanned = 0;
   for (const b of S.books) {
-    let perBook = 0;
-    for (let ci = 0; ci < b.content.chapters.length; ci++) {
-      const text = ch0Title(b, ci) + '\n' + chapterText(b.content.chapters[ci]);
-      const lower = text.toLowerCase();
-      let idx = 0;
-      while ((idx = lower.indexOf(ql, idx)) !== -1 && perBook < 5 && results.length < 200) {
-        const start = Math.max(0, idx - 40), end = Math.min(text.length, idx + ql.length + 50);
-        results.push({ bookId: b.id, bookTitle: b.title, chapterIndex: ci, chapterTitle: b.content.chapters[ci].title, ctx: (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '') });
-        idx += ql.length; perBook++;
-      }
-      if (perBook >= 5) break;
-    }
+    const rec = await getSidx(b);
+    if (token !== _srToken) return;
+    if (!rec) continue;
+    /* 点了「更多」就放开单本 20 条的限制，否则再怎么加载还是那 20 条 */
+    const r = searchBookWithIndex(b, rec, ql, results, _srCap, bump === true ? Infinity : SR_PER_BOOK);
+    total += r.n; capped = capped || r.capped;
+    scanned += rec.chars;
+    if (scanned > 2e6) { await idle(0); scanned = 0; if (token !== _srToken) return; }
+    if (capped) break;
   }
+  if (token !== _srToken) return;
   if (!results.length) { out.innerHTML = `<div class="sr-item" style="cursor:default;color:var(--aux)">书库中未找到「${esc(q)}」</div>`; return; }
   const byBook = {};
   results.forEach(r => (byBook[r.bookId] = byBook[r.bookId] || []).push(r));
-  out.innerHTML = Object.entries(byBook).map(([bid, rs]) =>
+  let html = Object.entries(byBook).map(([bid, rs]) =>
     `<div class="sr-group"><div class="sr-book">${esc(rs[0].bookTitle)} · ${rs.length} 处</div>` +
     rs.map(r => `<div class="sr-item" data-jump="${bid}|${r.chapterIndex}|${esc(q)}">
-      <div class="where">${esc(r.chapterTitle)}</div>
+      <div class="where">${esc(r.chapterTitle || '')}</div>
       <div class="ctx">${hlCtx(r.ctx, q)}</div>
     </div>`).join('') + `</div>`
   ).join('');
+  if (total > results.length) {
+    html += `<div class="sr-more">共 ${capped ? total + '+' : total} 处 · 已显示 ${results.length} 处 · 点此再加载 200 处</div>`;
+  }
+  out.innerHTML = html;
+  renderSidxStatus();
+  } catch (err) {
+    console.error(err);
+    out.innerHTML = `<div class="sr-item" style="cursor:default;color:#c8102e">检索出错：${esc(err && err.message || String(err))}</div>`;
+  } finally {
+    clearTimeout(slow);
+  }
 }
 async function jumpToResult(bid, ci, q) {
   const b = S.books.find(x => x.id === bid); if (!b) return;
@@ -2752,7 +2933,9 @@ async function restoreBackup(file) {
     await dbPut('anns', a); S.allAnns.push(a); addA++;
   }
   if (S.current) S.anns = S.allAnns.filter(a => a.bookId === S.current.id);
+  _sidx.clear(); _sidxChars = 0;      // 恢复可能补进正文，旧索引一律作废
   renderLibrary();
+  ensureAllIndexes();
   const parts = [`恢复完成：新增 ${addB} 本书`];
   if (fixB) parts.push(`补全 ${fixB} 本`);
   parts.push(`新增批注 ${addA} 条`);
@@ -2856,7 +3039,11 @@ function renderBackupHint() {
   el.firstChild.textContent = txt;
 }
 function closeModal(id) { $('#' + id).classList.add('closing'); $('#' + id).hidden = true; }
-function openModal(id) { $('#' + id).hidden = false; }
+function openModal(id) {
+  $('#' + id).hidden = false;
+  if (id === 'settings-modal') { renderSidxStatus(); return; }
+  if (id === 'search-modal') { renderSidxStatus(); ensureAllIndexes(); }   // 开检索就顺手把缺的索引补上
+}
 document.addEventListener('click', e => {
   const cm = e.target.closest('[data-close-modal]');
   if (cm) { closeModal(cm.dataset.closeModal); return; }
@@ -3089,6 +3276,7 @@ $$('.sr-tabs button').forEach(b => b.addEventListener('click', () => {
   b.classList.add('cur'); _srTab = b.dataset.st; runSearch();
 }));
 $('#search-results').addEventListener('click', async e => {
+  if (e.target.closest('.sr-more')) { runSearch(true); return; }
   const it = e.target.closest('.sr-item'); if (!it || !it.dataset.jump) return;
   if (_srTab === 'ann') {
     const a = S.allAnns.find(x => x.id === it.dataset.jump);
@@ -3251,12 +3439,22 @@ $('#backup-hint').addEventListener('click', e => {
 });
 $('#stg-persist-btn').addEventListener('click', () => askPersist(true));
 
+$('#btn-sidx-rebuild').addEventListener('click', async () => {
+  const btn = $('#btn-sidx-rebuild');
+  btn.disabled = true; btn.textContent = '重建中…';
+  try {
+    await rebuildAllIndexes();
+    toast('检索索引已重建 · ' + sidxReadyCount() + '/' + S.books.length + ' 本');
+  } catch (e) { toast('重建失败：' + (e && e.message || e)); }
+  finally { btn.disabled = false; btn.textContent = '重建索引'; }
+});
 $('#btn-clear-all').addEventListener('click', async () => {
   if (S.allAnns.length && !confirm(`你有 ${S.allAnns.length} 条批注尚未确认备份。建议先点「导出批注备份」保存一份。\n\n仍要继续清空？`)) return;
   if (!confirm('确认清空全部书籍与批注？此操作不可恢复！')) return;
   if (!confirm('再次确认：真的要清空所有数据吗？')) return;
-  await dbClear('books'); await dbClear('anns');
+  await dbClear('books'); await dbClear('anns'); await dbClear('sidx');
   S.books = []; S.allAnns = []; S.current = null;
+  _sidx.clear(); _sidxChars = 0;
   closeReader(); renderLibrary(); closeModal('settings-modal');
   toast('已清空');
 });
@@ -3353,6 +3551,8 @@ async function seedSample() {
     /* 静默申请持久化存储：成功则浏览器不会自动清掉书和批注。
        被拒也无害，只是回落到「定期备份」这道防线。 */
     askPersist(false).catch(() => {});
+    /* 检索索引后台补齐：老版本导入的书没索引，晚 1.2 秒再开工，别跟首屏抢资源 */
+    setTimeout(() => ensureAllIndexes(), 1200);
   } catch (err) {
     console.error(err);
     document.body.innerHTML = '<div style="padding:60px;font-family:sans-serif">墨砚初始化失败：' + esc(err.message || String(err)) + '</div>';
