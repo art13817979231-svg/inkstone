@@ -55,6 +55,16 @@ a{color:var(--cinnabar)}
 .backup-hint{font-family:var(--sans);font-size:12px;color:#8a6d1f;background:#fdf6e3;border-left:3px solid #d4b886;padding:9px 14px;margin:-20px 0 30px;cursor:pointer;letter-spacing:.03em;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .backup-hint:hover{background:#fbf0d4}
 .backup-hint::after{content:"→";font-family:var(--mono);color:#b3934f}
+/* 数据保全状态块 */
+.stg-guard{font-family:var(--sans);font-size:12px;border:1px solid var(--line);background:var(--bg2,#fbfaf6);padding:10px 12px;margin-top:6px;line-height:2}
+.stg-guard .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.stg-guard .k{color:var(--aux);letter-spacing:.05em;flex:none}
+.stg-guard .v{color:var(--body);text-align:right}
+.stg-guard .v.ok{color:#2f7d32}
+.stg-guard .v.warn{color:#8a6d1f}
+.stg-guard .v.bad{color:#c8102e}
+.backup-hint .bk-now{font-family:var(--sans);font-size:11px;color:#8a6d1f;border:1px solid #d4b886;background:#fff;padding:4px 10px;flex:none;letter-spacing:.05em;cursor:pointer}
+.backup-hint .bk-now:hover{background:#fbf0d4}
 #book-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:30px 26px}
 .book-card{cursor:pointer;position:relative}
 .book-card .cover{aspect-ratio:3/4;border:1px solid var(--line);background:#fff;overflow:hidden;position:relative;transition:transform .18s ease}
@@ -657,7 +667,13 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
       </div>
       <hr style="border:none;border-top:1px solid var(--line);margin:20px 0" data-page-node-id="SpkHrLineL4dV8s">
       <div class="field" data-page-node-id="gjUNvPSwlbn602E5LnAfwj"><label data-page-node-id="VMp5RaO7SalxI5VbshXzti">数据保全（批注只存在本机浏览器，请定期备份）</label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <div class="stg-guard" id="stg-guard" data-page-node-id="StgGuardBoxK2wQ7p">
+          <div class="row"><span class="k">本机存储</span><span class="v" id="stg-persist">检测中…</span></div>
+          <div class="row"><span class="k">占用空间</span><span class="v" id="stg-usage">—</span></div>
+          <div class="row"><span class="k">上次备份</span><span class="v" id="stg-lastbackup">—</span></div>
+          <button class="btn small ghost" id="stg-persist-btn" hidden style="margin-top:8px">申请存储保护</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
           <button class="btn small ghost" id="btn-backup-light">导出批注备份</button>
           <button class="btn small ghost" id="btn-backup-full">导出完整备份</button>
           <button class="btn small ghost" id="btn-restore">从备份恢复</button>
@@ -2622,7 +2638,7 @@ async function exportBackup(mode) {
   const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
   download(`墨砚备份_${full ? '完整' : '批注'}_${stamp}.json`, json, 'application/json;charset=utf-8');
   toast(`已导出${full ? '完整' : '批注'}备份：${books.length} 本 / ${S.allAnns.length} 条批注 · ${fmtBytes(new Blob([json]).size)}`);
-  try { localStorage.setItem('inkstone.lastBackup', String(Date.now())); renderBackupHint(); } catch (e) {}
+  try { localStorage.setItem('inkstone.lastBackup', String(Date.now())); renderBackupHint(); renderLastBackup(); } catch (e) {}
 }
 
 async function restoreBackup(file) {
@@ -2662,20 +2678,102 @@ async function restoreBackup(file) {
   parts.push(`新增批注 ${addA} 条`);
   if (skipA) parts.push(`跳过重复 ${skipA} 条`);
   toast(parts.join(' · '));
-  try { localStorage.setItem('inkstone.lastBackup', String(Date.now())); renderBackupHint(); } catch (e) {}
+  try { localStorage.setItem('inkstone.lastBackup', String(Date.now())); renderBackupHint(); renderLastBackup(); } catch (e) {}
 }
 
-/* 书架顶部提示：从未备份过 或 超过 14 天未备份且有批注 → 提醒 */
-function renderBackupHint() {
-  const el = $('#backup-hint'); if (!el) return;
+/* ---------- 存储守卫 ----------
+   批注全在 IndexedDB 里。手机浏览器（尤其 iOS Safari）在长期不访问或
+   存储紧张时会清掉站点数据 —— 那是不可逆的。两道防线：
+   1) 申请持久化存储（persist），让浏览器别自动清理；
+   2) 提醒定期导出备份。 */
+let _persistState = 'unknown';   /* granted | denied | unsupported | unknown */
+const BACKUP_REMIND_DAYS = 7;    /* iOS 的清理周期以周计，14 天太松 */
+
+function lastBackupDays() {
   let last = 0;
   try { last = parseInt(localStorage.getItem('inkstone.lastBackup') || '0', 10); } catch (e) {}
-  const days = last ? Math.floor((Date.now() - last) / 86400000) : -1;
-  const need = S.allAnns.length > 0 && (days === -1 || days >= 14);
+  return last ? Math.floor((Date.now() - last) / 86400000) : -1;
+}
+
+async function askPersist(manual) {
+  if (!(navigator.storage && navigator.storage.persist)) {
+    _persistState = 'unsupported';
+    renderPersist();
+    if (manual) toast('这个浏览器不支持存储保护，请依赖定期备份');
+    return _persistState;
+  }
+  try {
+    /* Chrome 会按站点使用频率决定给不给；Safari 一般直接给。
+       已经拿到过的不要再打扰用户。 */
+    let has = false;
+    try { has = await navigator.storage.persisted(); } catch (e) {}
+    if (!has) has = await navigator.storage.persist();
+    _persistState = has ? 'granted' : 'denied';
+  } catch (e) { _persistState = 'unknown'; }
+  renderPersist();
+  if (manual) {
+    if (_persistState === 'granted') toast('已开启存储保护：浏览器不会自动清理墨砚的数据');
+    else toast('浏览器这次没批准 —— 多为站点使用频率不足，读几天再点一次；在此之前请定期导出备份');
+  }
+  return _persistState;
+}
+
+function renderPersist() {
+  const el = $('#stg-persist'), btn = $('#stg-persist-btn');
+  if (!el) return;
+  const M = {
+    granted:     ['ok',   '已受保护 · 浏览器不会自动清理'],
+    denied:      ['bad',  '未受保护 · 清缓存时会一起清掉'],
+    unsupported: ['warn', '该浏览器不支持申请 · 请依赖备份'],
+    unknown:     ['warn', '状态未知 · 请依赖备份']
+  };
+  const m = M[_persistState] || M.unknown;
+  el.className = 'v ' + m[0];
+  el.textContent = m[1];
+  /* 已拿到、或浏览器根本不支持时都别留按钮 —— 点了也只是弹一句解释，是噪音。
+     只有「被拒」才需要留个重试入口（Chrome 按使用频率判定，读几天可能就给过）。 */
+  if (btn) btn.hidden = (_persistState === 'granted' || _persistState === 'unsupported');
+}
+
+async function renderStorageUsage() {
+  const el = $('#stg-usage'); if (!el) return;
+  const plain = `${S.books.length} 本 · ${S.allAnns.length} 条批注`;
+  if (!(navigator.storage && navigator.storage.estimate)) { el.textContent = plain; return; }
+  try {
+    const r = await navigator.storage.estimate() || {};
+    let t = fmtBytes(r.usage || 0);
+    if (r.quota) t += ` / 上限 ${fmtBytes(r.quota)}`;
+    el.textContent = t + ' · ' + plain;
+  } catch (e) { el.textContent = plain; }
+}
+
+function renderLastBackup() {
+  const el = $('#stg-lastbackup'); if (!el) return;
+  const d = lastBackupDays();
+  if (d === -1) {
+    el.className = 'v ' + (S.allAnns.length ? 'warn' : '');
+    el.textContent = S.allAnns.length ? '从未备份 · 点下方按钮导出' : '从未备份';
+    return;
+  }
+  el.className = 'v ' + (d >= BACKUP_REMIND_DAYS ? 'warn' : 'ok');
+  el.textContent = d === 0 ? '今天' : (d < 30 ? `${d} 天前` : new Date(parseInt(localStorage.getItem('inkstone.lastBackup'), 10)).toLocaleDateString('zh-CN'));
+}
+
+function renderDataGuard() { renderPersist(); renderStorageUsage(); renderLastBackup(); }
+
+/* 书架顶部提示：从未备份过 或 超过 7 天未备份且有批注 → 提醒 */
+function renderBackupHint() {
+  const el = $('#backup-hint'); if (!el) return;
+  const days = lastBackupDays();
+  const need = S.allAnns.length > 0 && (days === -1 || days >= BACKUP_REMIND_DAYS);
   el.hidden = !need;
-  if (need) el.textContent = days === -1
-    ? `你的 ${S.allAnns.length} 条批注只存在这台设备的浏览器里，尚未备份 · 点此备份`
-    : `距上次备份已 ${days} 天，${S.allAnns.length} 条批注建议再备份一次 · 点此备份`;
+  if (!need) return;
+  const txt = days === -1
+    ? `你的 ${S.allAnns.length} 条批注只存在这台设备的浏览器里，尚未备份`
+    : `距上次备份已 ${days} 天，${S.allAnns.length} 条批注建议再备份一次`;
+  /* 「立即备份」直接导出，不必先进设置 —— 少一步就多一分备份率 */
+  el.innerHTML = '<span></span><button type="button" class="bk-now">立即备份</button>';
+  el.firstChild.textContent = txt;
 }
 function closeModal(id) { $('#' + id).classList.add('closing'); $('#' + id).hidden = true; }
 function openModal(id) { $('#' + id).hidden = false; }
@@ -3045,6 +3143,7 @@ $('#btn-settings').addEventListener('click', () => {
   $('#llm-model').value = c.model || '';
   $('#llm-enabled').checked = !!c.enabled;
   fillVoiceList();   // 每次打开都重取：系统里新装的语音要能立刻选到
+  renderDataGuard(); // 存储保护 / 占用 / 上次备份
   openModal('settings-modal');
 });
 $('#settings-save').addEventListener('click', () => {
@@ -3065,7 +3164,11 @@ $('#backup-input').addEventListener('change', async e => {
   e.target.value = '';
   if (f) await restoreBackup(f);
 });
-$('#backup-hint').addEventListener('click', () => { openModal('settings-modal'); });
+$('#backup-hint').addEventListener('click', e => {
+  if (e.target.closest('.bk-now')) { exportBackup('light'); return; }
+  openModal('settings-modal');
+});
+$('#stg-persist-btn').addEventListener('click', () => askPersist(true));
 
 $('#btn-clear-all').addEventListener('click', async () => {
   if (S.allAnns.length && !confirm(`你有 ${S.allAnns.length} 条批注尚未确认备份。建议先点「导出批注备份」保存一份。\n\n仍要继续清空？`)) return;
@@ -3166,6 +3269,9 @@ async function seedSample() {
     renderLibrary();
     initSpeakSettings();
     idleChrome();
+    /* 静默申请持久化存储：成功则浏览器不会自动清掉书和批注。
+       被拒也无害，只是回落到「定期备份」这道防线。 */
+    askPersist(false).catch(() => {});
   } catch (err) {
     console.error(err);
     document.body.innerHTML = '<div style="padding:60px;font-family:sans-serif">墨砚初始化失败：' + esc(err.message || String(err)) + '</div>';
