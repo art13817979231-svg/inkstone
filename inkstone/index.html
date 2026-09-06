@@ -79,6 +79,12 @@ a{color:var(--cinnabar)}
 .book-card .del{position:absolute;top:6px;right:6px;z-index:3;background:rgba(26,26,26,.82);color:#fff;font-family:var(--mono);font-size:11px;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;opacity:0;transition:opacity .15s}
 .book-card:hover .del{opacity:1}
 .book-card .del:hover{background:var(--cinnabar)}
+/* 读完标记：未完成时不打扰（悬停才现），读完时常显一枚朱砂小签 */
+.book-card .fin{position:absolute;bottom:6px;left:6px;z-index:3;font-family:var(--sans);font-size:10px;letter-spacing:.08em;padding:3px 7px;border:none;cursor:pointer;background:rgba(26,26,26,.82);color:#fff;opacity:0;transition:opacity .15s}
+.book-card:hover .fin{opacity:1}
+.book-card .fin:hover{background:#8a0b20}
+.book-card .fin.on{background:var(--cinnabar);opacity:1}
+@media (hover:none){.book-card .fin{opacity:.62}}   /* 触屏没有 hover，否则这个按钮等于不存在 */
 #import-card{aspect-ratio:3/4;border:1.5px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;cursor:pointer;color:var(--aux);transition:all .18s}
 #import-card:hover{border-color:var(--ink);color:var(--ink)}
 #import-card .plus{font-size:44px;font-weight:200;font-family:var(--sans);line-height:1}
@@ -398,6 +404,7 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
         <button data-f="text">文字</button>
         <button data-f="reading">在读</button>
         <button data-f="noted">有批注</button>
+        <button data-f="done">读完</button>
       </div>
       <span class="lt-count" id="lt-count"></span>
     </div>
@@ -1236,8 +1243,9 @@ function libSortedBooks(annByBook) {
     if (f === 'pdf' || f === 'epub') return b.format === f;
     if (f === 'text') return b.format === 'txt' || b.format === 'md' || b.format === 'markdown';
     /* 「在读」= 打开过且没读完。刚打开还没翻页（进度 0）也算在读，否则新书会从筛选里消失 */
-    if (f === 'reading') return b.lastOpened > 0 && bookPct(b) < 0.995;
+    if (f === 'reading') return b.lastOpened > 0 && bookPct(b) < 0.995 && !b.finishedAt;
     if (f === 'noted') return !!noted[b.id];
+    if (f === 'done') return !!b.finishedAt;
     return true;
   });
   const cmp = {
@@ -1252,8 +1260,9 @@ function renderLibrary() {
   const stats = $('#lib-stats');
   const wk = weekKeyOf(Date.now());
   const weekMs = S.books.reduce((acc, b) => acc + (b.weekKey === wk ? (b.readMsWeek || 0) : 0), 0);
-  const reading = S.books.filter(b => b.lastOpened > 0).length;
-  stats.innerHTML = `本周阅读 <b>${fmtMin(weekMs)}</b><span>在读 <b>${reading}</b> 本</span><span>馆藏 <b>${S.books.length}</b> 本</span><span id="stat-anns" style="cursor:pointer" title="查看全部批注">批注 <b>${S.allAnns.length}</b> 条 ↗</span>`;
+  const doneN = S.books.filter(b => b.finishedAt).length;
+  const reading = S.books.filter(b => b.lastOpened > 0 && !b.finishedAt).length;
+  stats.innerHTML = `本周阅读 <b>${fmtMin(weekMs)}</b><span>在读 <b>${reading}</b> 本</span><span id="stat-done" style="cursor:pointer" title="只看读完的书">读完 <b>${doneN}</b> 本 ↗</span><span>馆藏 <b>${S.books.length}</b> 本</span><span id="stat-anns" style="cursor:pointer" title="查看全部批注">批注 <b>${S.allAnns.length}</b> 条 ↗</span>`;
   $('#onboard').hidden = S.books.length > 0;
   renderBackupHint();
   const grid = $('#book-grid');
@@ -1267,7 +1276,7 @@ function renderLibrary() {
   $('#lt-count').textContent = list.length === S.books.length
     ? S.books.length + ' 本' : list.length + ' / ' + S.books.length + ' 本';
   grid.innerHTML = (list.length ? '' :
-    `<div style="grid-column:1/-1;font-family:var(--sans);font-size:13px;color:var(--aux);padding:4px 0 6px">当前筛选「${esc(f === 'text' ? '文字' : f === 'noted' ? '有批注' : f === 'reading' ? '在读' : f.toUpperCase())}」下没有书</div>`)
+    `<div style="grid-column:1/-1;font-family:var(--sans);font-size:13px;color:var(--aux);padding:4px 0 6px">当前筛选「${esc(f === 'text' ? '文字' : f === 'noted' ? '有批注' : f === 'reading' ? '在读' : f === 'done' ? '读完' : f.toUpperCase())}」下没有书</div>`)
     + list.map(b => {
     const pct = Math.round(bookPct(b) * 100);
     return `<div class="book-card" data-id="${b.id}">
@@ -1275,6 +1284,7 @@ function renderLibrary() {
         <img src="${b.cover}" alt="">
         <span class="fmt">${b.format.toUpperCase()}</span>
         ${annByBook[b.id] ? `<span class="annbadge">${annByBook[b.id]}</span>` : ''}
+        <button class="fin ${b.finishedAt ? 'on' : ''}" title="${b.finishedAt ? '取消读完标记' : '标为读完'}">${b.finishedAt ? '已读完' : '标为读完'}</button>
         <button class="del" title="删除">×</button>
       </div>
       <div class="meta">
@@ -1374,6 +1384,23 @@ async function saveProgressNow() {
   if (b.format === 'pdf') { b.progress = { ...b.progress, page: S.pdfPage }; }
   else { b.progress = { ...b.progress, chapterIndex: S.chapter, scrollPct: +scrollPct().toFixed(4) }; }
   await dbPut('books', b);
+  /* 读到尾自动标读完。只认这一次跨越，之后用户手动改回来就不再自动覆盖他的判断 */
+  if (!b.finishedAt && !b.finishedOff && bookPct(b) >= 0.995) await markFinished(b, true, true);
+}
+/* 读完状态：自动判定（读到 99.5%）+ 手动切换（书架卡片上的小签）。
+   “在读”筛选项要排除已读完的，否则标完还赖在在读列表里。 */
+async function markFinished(b, on, silent) {
+  if (!b) return;
+  const was = !!b.finishedAt;
+  if (was === !!on) return;
+  b.finishedAt = on ? Date.now() : 0;
+  /* 手动取消时记一笔：书确实读到尾了，是用户自己判定「还不算读完」。
+     没这笔账的话，下一次保存进度又会把标记贴回去，用户会觉得改不动 */
+  b.finishedOff = on ? false : (bookPct(b) >= 0.995);
+  await dbPut('books', b);
+  renderLibrary();
+  if (!silent) toast(on ? '已标记读完《' + b.title + '》' : '已把《' + b.title + '》放回在读');
+  else if (on) toast('读完《' + b.title + '》· 已归入「读完」', 3000);
 }
 /* --- 高亮定位（跨空白匹配 + Range 包裹） --- */
 function applyOneMark(root, ann) {
@@ -3352,6 +3379,13 @@ $('#file-input').addEventListener('change', e => {
   importFiles(fs);
 });
 $('#book-grid').addEventListener('click', e => {
+  const card0 = e.target.closest('.book-card');
+  const fin = e.target.closest('.fin');
+  if (fin) {
+    const b = S.books.find(x => x.id === card0.dataset.id);
+    markFinished(b, !b.finishedAt);
+    return;
+  }
   const del = e.target.closest('.del');
   if (del) { deleteBook(del.closest('.book-card').dataset.id); return; }
   const card = e.target.closest('.book-card');
@@ -3367,7 +3401,10 @@ $('#lib-tools').addEventListener('click', e => {
 });
 /* 批注总览 */
 $('#btn-anns').addEventListener('click', () => openAnnsModal());
-$('#lib-stats').addEventListener('click', e => { if (e.target.closest('#stat-anns')) openAnnsModal(); });
+$('#lib-stats').addEventListener('click', e => {
+  if (e.target.closest('#stat-anns')) { openAnnsModal(); return; }
+  if (e.target.closest('#stat-done')) { setPrefs({ libFilter: 'done' }); renderLibrary(); }
+});
 $('#am-book').addEventListener('change', renderAnnsOverview);
 $('#am-note').addEventListener('change', renderAnnsOverview);
 $('#am-sort').addEventListener('change', renderAnnsOverview);
