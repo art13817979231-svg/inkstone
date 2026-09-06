@@ -213,6 +213,12 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
 .sp-rate-row{display:flex;align-items:center;gap:11px;margin-top:11px;font-family:var(--sans);font-size:12px;color:var(--body)}
 .sp-rate-row input[type=range]{flex:1;max-width:230px;accent-color:var(--ink);cursor:pointer}
 .sp-rate-row .val{font-family:var(--mono);font-size:12px;color:var(--ink);min-width:42px}
+.sp-voice-hint{font-family:var(--sans);font-size:12px;line-height:1.85;padding:10px 13px;margin-top:11px;border-left:2px solid var(--line);background:rgba(26,26,26,.022);color:var(--body)}
+.sp-voice-hint.warn{background:#fdf6e3;border-left-color:#d4b886;color:#5c4a1e}
+.sp-voice-hint.good{background:rgba(74,107,61,.07);border-left-color:#4a6b3d;color:#3d5233}
+.sp-voice-hint b{font-family:var(--mono);font-weight:400;color:var(--ink)}
+.sp-voice-hint ol{margin:6px 0 0;padding-left:19px}
+.sp-voice-hint li{margin:2px 0}
 .note-hint b{color:var(--ink);font-weight:400}
 /* 划词即写：工具条内联输入行，不遮挡正文 */
 #sel-pop{display:block}
@@ -629,6 +635,7 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
       <div class="field" data-page-node-id="SpkFieldQ3wM8Rt">
         <label data-page-node-id="SpkLabelK7nP2v">朗读声音</label>
         <select id="sp-voice" data-page-node-id="SpkVoiceSelB4tX9d"></select>
+        <div id="sp-voice-hint" class="sp-voice-hint" hidden></div>
         <div class="sp-rate-row" data-page-node-id="SpkRateRowF6mQ1c">
           <span data-page-node-id="SpkRateLabW8dL3s">语速</span>
           <input type="range" id="sp-rate" min="0.6" max="1.5" step="0.05" data-page-node-id="SpkRateRngT2vN7h">
@@ -638,8 +645,8 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
           <button class="btn small ghost" id="sp-test" data-page-node-id="SpkTestBtnN3xF8m">试听一句</button>
         </div>
         <div class="note-hint" style="margin-top:8px" data-page-node-id="SpkHintR7mW2p">
-          声音来自你电脑自带的语音库，本应用不联网、不上传任何文本。<br>
-          嫌机械的话：macOS 到<b>「系统设置 → 辅助功能 → 朗读内容 → 系统语音 → 管理语音」</b>里下载中文的<b>「增强 / 高级」</b>版本，装完回到这里选它，自然度会明显提升。
+          声音来自你电脑自带的语音库，朗读时本应用不联网、不上传任何文本。<br>
+          换系统语音后回到这里重开一次设置，下拉里才会刷新出新装的语音。
         </div>
       </div>
       <hr style="border:none;border-top:1px solid var(--line);margin:20px 0" data-page-node-id="SpkHrLineL4dV8s">
@@ -1679,6 +1686,7 @@ function fillVoiceList() {
   const QN = { 3: '高级', 2: '增强', 1: '标准', 0: '紧凑' };
   if (!vs.length) {
     sel.innerHTML = '<option value="">（系统暂无中文语音）</option>';
+    renderVoiceHint([]);   /* 别留着上一次的诊断结论，会误导 */
     return;
   }
   sel.innerHTML = '<option value="">自动（选最好的）</option>' + vs.map(v => {
@@ -1686,6 +1694,44 @@ function fillVoiceList() {
     const remote = v.localService ? '' : ' · 云端';
     return `<option value="${esc(v.voiceURI)}"${v.voiceURI === cur ? ' selected' : ''}>${esc(v.name)} · ${esc(v.lang)}${tag ? ' · ' + tag : ''}${remote}</option>`;
   }).join('');
+  renderVoiceHint(vs);
+}
+/* 音质诊断：只列语音没用，得直说「你现在是最低档」+ 具体到名字的下载步骤。
+   否则用户以为下拉里那个就是最好的，机械感的锅就背在应用头上了。 */
+function voiceStepsHtml() {
+  const ua = navigator.userAgent || '';
+  if (/Mac|iPhone|iPad/.test(ua)) {
+    return `这机器上可下载 <b>Yu-shu</b>（女声）或 <b>Li-mu</b>（男声）的<b>高级（Premium）</b>版，约 180 MB：
+      <ol><li>系统设置 → 辅助功能 → 朗读内容</li>
+      <li>「系统语音」→「管理语音…」→ 中文（普通话）</li>
+      <li>下载 Premium 那一档（别选 Compact，那个和现在一样机械）</li></ol>
+      装完回来，下拉里会多出这两个（中文系统下可能显示本地名），选它。`;
+  }
+  if (/Windows/.test(ua)) {
+    return `Windows：设置 → 时间和语言 → 语音 →「添加语音」→ 中文（简体），
+      认准带 <b>「自然」</b> 标记的（Natural）。`;
+  }
+  return `到系统的「语言与语音 / 朗读」设置里，下载中文的<b>增强或高级</b>语音包。
+    不同系统入口差别较大，认准体积最大的那个一般就是高级版。`;
+}
+function renderVoiceHint(vs) {
+  const box = $('#sp-voice-hint'); if (!box) return;
+  if (!vs.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const QN = { 3: '高级', 2: '增强', 1: '标准', 0: '紧凑' };
+  const best = vs.reduce((m, v) => Math.max(m, voiceQuality(v)), 0);
+  if (best >= 2) {
+    const top = vs.find(v => voiceQuality(v) === best);
+    box.className = 'sp-voice-hint good';
+    box.innerHTML = `当前最好的可用语音是 <b>${esc(top.name)}</b>（${QN[best]}档），音质已经到位。下拉里换其他声音可以换风格，自然度不会更好了。`;
+    return;
+  }
+  const names = [...new Set(vs.map(v => v.name))].slice(0, 4).map(n => esc(n)).join(' / ');
+  box.className = 'sp-voice-hint warn';
+  box.innerHTML = `系统里现有的中文语音（${names}）都没标出高级 / 增强 ——
+    <b>这大概率就是机械感的来源，调语速救不回来。</b><br>${voiceStepsHtml()}
+    <div style="margin-top:7px;opacity:.82">浏览器不告诉我们语音的真实档位，
+    如果你已经装过高级包，以实际听感为准，忽略这条提示即可。</div>`;
 }
 function initSpeakSettings() {
   const sel = $('#sp-voice'), rng = $('#sp-rate'), val = $('#sp-rate-val');
