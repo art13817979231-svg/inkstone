@@ -285,8 +285,11 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
 .am-den-tip .link:hover{border-bottom-color:var(--cinnabar);color:var(--cinnabar)}
 .btn-mini{font-family:var(--sans);font-size:12px;padding:5px 10px;border:1px solid var(--line);background:none;color:var(--aux);cursor:pointer}
 .btn-mini:hover{color:var(--ink);border-color:var(--ink)}
-.am-group{font-family:var(--sans);font-size:12px;color:var(--aux);letter-spacing:.08em;margin:16px 0 6px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+.am-group{font-family:var(--sans);font-size:12px;color:var(--aux);letter-spacing:.08em;margin:16px 0 6px;padding-bottom:5px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;user-select:none}
 .am-group:first-child{margin-top:4px}
+.am-group:hover{color:var(--ink)}
+.am-group .fold{font-family:var(--mono);font-size:9.5px;letter-spacing:0;color:var(--aux);flex:none}
+.am-group.folded{border-bottom-color:var(--ink);color:var(--body)}
 .am-item{display:flex;gap:11px;padding:11px 4px;border-bottom:1px solid rgba(204,204,204,.45);cursor:pointer}
 .am-item:hover{background:rgba(26,26,26,.025)}
 .am-item .body{flex:1;min-width:0}
@@ -295,6 +298,12 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
 .am-item .where .chip.u{border-radius:0;height:2.5px;width:11px}
 .am-item .q{font-size:13px;color:var(--sub);line-height:1.75;border-left:2px solid var(--line);padding-left:10px}
 .am-item .n{font-size:13px;color:var(--ink);line-height:1.75;margin-top:7px;white-space:pre-wrap}
+.am-item .n.empty{color:var(--aux);font-family:var(--sans);font-size:12px;border-bottom:1px dashed var(--line);display:inline-block;padding-bottom:1px}
+.am-item .n.empty:hover{color:var(--cinnabar);border-bottom-color:var(--cinnabar)}
+.am-note-ed{width:100%;margin-top:7px;font-family:inherit;font-size:13px;color:var(--ink);line-height:1.75;padding:7px 9px;border:1px solid var(--cinnabar);background:var(--paper);resize:vertical;min-height:60px;outline:none}
+.am-more{font-family:var(--sans);font-size:12px;color:var(--aux);text-align:center;padding:14px 0 6px;cursor:pointer;letter-spacing:.06em}
+.am-more:hover{color:var(--ink)}
+.am-more b{font-family:var(--mono);font-weight:400;color:var(--ink)}
 .am-empty{padding:46px 20px;text-align:center;color:var(--aux);font-size:13px;font-family:var(--sans);line-height:2.1}
 .modal-foot .grow{flex:1}
 .am-sel{font-family:var(--mono);font-size:11px;color:var(--aux)}
@@ -554,6 +563,10 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
           <option value="">全部批注</option>
           <option value="yes">仅写了想法的</option>
           <option value="no">仅没写想法的</option>
+        </select>
+        <select id="am-sort">
+          <option value="time">最近添加</option>
+          <option value="pos">按书内位置</option>
         </select>
         <span class="grow"></span>
         <button class="btn-mini" id="am-all">全选</button>
@@ -2032,19 +2045,36 @@ function amCountByBook() {
   const m = {}; S.allAnns.forEach(a => { m[a.bookId] = (m[a.bookId] || 0) + 1; });
   return m;
 }
+const AM_PAGE = 80;           /* 每批渲染条数：几百条时一次全画会明显卡 */
+let _amPage = 1;
+let _amFold = new Set();      /* 折叠的书 id */
+let _amLoadingAt = 0;
+/* 位置序：同一本按页/章，跨书按书名 —— 回看一本书时比按添加时间顺得多 */
+function amSortList(list) {
+  const mode = ($('#am-sort') || {}).value || 'time';
+  if (mode !== 'pos') return list.slice().sort((x, y) => y.createdAt - x.createdAt);
+  return list.slice().sort((x, y) => {
+    const bx = S.books.find(b => b.id === x.bookId), by = S.books.find(b => b.id === y.bookId);
+    const tx = (bx && bx.title) || '', ty = (by && by.title) || '';
+    if (tx !== ty) return tx.localeCompare(ty, 'zh-CN');
+    const px = (bx && bx.format === 'pdf') ? (x.page || 1) : (x.chapterIndex || 0);
+    const py = (by && by.format === 'pdf') ? (y.page || 1) : (y.chapterIndex || 0);
+    return (px - py) || (x.createdAt - y.createdAt);
+  });
+}
 function amFiltered() {
   const bid = ($('#am-book') || {}).value || '';
   const cur = $('#am-colors .cur');
   const c = cur ? cur.dataset.c : '';
   const nf = ($('#am-note') || {}).value || '';
-  return S.allAnns.filter(a => {
+  return amSortList(S.allAnns.filter(a => {
     if (bid && a.bookId !== bid) return false;
     if (c && a.color !== c) return false;
     const has = !!(a.note && a.note.trim());
     if (nf === 'yes' && !has) return false;
     if (nf === 'no' && has) return false;
     return true;
-  }).sort((x, y) => y.createdAt - x.createdAt);
+  }));
 }
 /* 密度自检只吃「书 + 颜色」两个筛选，不受「仅没写想法的」影响 ——
    否则一切到无想法，密度恒为 0，这条统计就没意义了。 */
@@ -2127,25 +2157,119 @@ function updateAmSel() {
   const n = [..._amSel].filter(id => ids.has(id)).length;
   $('#am-sel').textContent = n ? '已选 ' + n + ' 条' : '点条目跳回原文 · 勾选可批量导出';
 }
-function renderAnnsOverview() {
-  const list = amFiltered();
-  $('#am-count').textContent = list.length + ' 条';
-  renderAmDensity();
-  const byBook = {};
-  list.forEach(a => (byBook[a.bookId] = byBook[a.bookId] || []).push(a));
-  $('#am-list').innerHTML = list.length ? Object.keys(byBook).map(bid => {
-    const b = S.books.find(x => x.id === bid);
-    return `<div class="am-group">《${esc((b && b.title) || '已删除的书')}》 · ${byBook[bid].length} 条</div>` +
-      byBook[bid].map(a => `<div class="am-item" data-aid="${a.id}">
+function amItemHtml(a, b) {
+  const noteHtml = a.note
+    ? `<div class="n" data-note="${esc(a.id)}">${esc(a.note)}</div>`
+    : `<div class="n empty" data-note="${esc(a.id)}">＋ 写想法</div>`;
+  return `<div class="am-item" data-aid="${a.id}">
         <input type="checkbox" class="pick" data-pick="${a.id}" ${_amSel.has(a.id) ? 'checked' : ''}>
         <div class="body">
           <div class="where"><span class="chip c-${a.color}${(a.type === 'underline' ? ' u' : '')}"></span>${esc(annWhere(a, b))} · ${new Date(a.createdAt).toLocaleDateString('zh-CN')}</div>
           <div class="q">${esc(a.text || '')}</div>
-          ${a.note ? `<div class="n">${esc(a.note)}</div>` : ''}
+          ${noteHtml}
         </div>
-      </div>`).join('');
-  }).join('') : `<div class="am-empty">没有符合条件的批注<br>换个筛选，或先去读会儿书</div>`;
+      </div>`;
+}
+/* 分批渲染：一次画几百条会卡住，且滚到底才能看到后面的书。
+   配额按「组」走 —— 组头只出现一次，不会加载更多时重复插入。 */
+function renderAnnsOverview(opt) {
+  opt = opt || {};
+  if (!opt.keep) _amPage = 1;
+  const list = amFiltered();
+  $('#am-count').textContent = list.length + ' 条';
+  renderAmDensity();
+  const box = $('#am-list');
+  const st = box.scrollTop;
+  if (!list.length) {
+    box.innerHTML = `<div class="am-empty">没有符合条件的批注<br>换个筛选，或先去读会儿书</div>`;
+    updateAmSel(); return;
+  }
+  const byBook = {}, order = [];
+  list.forEach(a => { if (!byBook[a.bookId]) { byBook[a.bookId] = []; order.push(a.bookId); } byBook[a.bookId].push(a); });
+  const limit = _amPage * AM_PAGE;
+  let shown = 0, html = '';
+  for (let gi = 0; gi < order.length; gi++) {
+    const bid = order[gi], arr = byBook[bid];
+    const b = S.books.find(x => x.id === bid);
+    const folded = _amFold.has(bid);
+    const quota = limit - shown;
+    if (gi > 0 && quota <= 0) break;
+    /* 折叠的组不占条目配额 —— 收起几本大书，后面的书就能提前露出来 */
+    const take = folded ? 0 : Math.min(arr.length, quota);
+    html += `<div class="am-group${folded ? ' folded' : ''}" data-fold="${esc(bid)}">` +
+      `<span>《${esc((b && b.title) || '已删除的书')}》 · ${arr.length} 条</span>` +
+      `<span class="fold">${folded ? '展开 ▾' : '收起 ▴'}</span></div>`;
+    if (take > 0) html += arr.slice(0, take).map(a => amItemHtml(a, b)).join('');
+    shown += take;
+    /* 折叠组的 take 是 0，不能当成「没画完」，否则折叠后直接收尾 */
+    if (!folded && take < arr.length) break;
+  }
+  const rest = list.length - shown;
+  if (rest > 0) html += `<div class="am-more" data-am-more>还有 <b>${rest}</b> 条 · 点击加载更多</div>`;
+  box.innerHTML = html;
+  box.scrollTop = opt.keep ? st : 0;
+  _amLoadingAt = Date.now();
   updateAmSel();
+}
+function amLoadMore(force) {
+  const box = $('#am-list');
+  if (!box.querySelector('[data-am-more]')) return;
+  if (!force && Date.now() - _amLoadingAt < 150) return;   /* 滚到底会连着触发，挡一下 */
+  _amPage++;
+  renderAnnsOverview({ keep: true });
+}
+/* 就地补/改想法：密度自检说"偏稀"时，不用跳回原文，在列表里直接补 */
+function editAmNote(id) {
+  const a = S.allAnns.find(x => x.id === id); if (!a) return;
+  const holder = [...$('#am-list').querySelectorAll('[data-note]')].find(el => el.dataset.note === id);
+  if (!holder || holder.tagName === 'TEXTAREA') return;
+  const bodyEl = holder.parentElement;
+  const ta = document.createElement('textarea');
+  ta.className = 'am-note-ed';
+  ta.value = a.note || '';
+  ta.placeholder = '写下你的想法…（回车保存 · Shift+回车换行 · Esc 取消）';
+  holder.replaceWith(ta);
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  let done = false;
+  const paint = () => {
+    const old = bodyEl.querySelector('.n, .am-note-ed');
+    const div = document.createElement('div');
+    div.className = 'n' + (a.note ? '' : ' empty');
+    div.dataset.note = a.id;
+    div.textContent = a.note || '＋ 写想法';
+    if (old) old.replaceWith(div); else bodyEl.appendChild(div);
+  };
+  const finish = async save => {
+    if (done) return; done = true;
+    const v = save ? ta.value.trim() : null;
+    if (save && v !== (a.note || '')) {
+      a.note = v;
+      const local = (S.anns || []).find(x => x.id === a.id); if (local) local.note = v;
+      try { await dbPut('anns', a); } catch (e) {}
+      /* 没打开过书时 S.anns 是 undefined，侧栏与高亮都无从谈起 */
+      try { if (S.current && S.current.id === a.bookId) renderAnnotSidebar(); } catch (e) {}
+      try { if (S.current && S.current.id === a.bookId && S.current.format === 'pdf') applyPdfMarks(); } catch (e) {}
+      renderAmDensity();
+      const nf = ($('#am-note') || {}).value || '';
+      /* 补了想法就不再属于「仅没写想法的」，反之亦然 —— 这时得整表重画 */
+      if ((nf === 'no' && v) || (nf === 'yes' && !v)) {
+        renderAnnsOverview();
+        toast(v ? '已补上想法' : '已清空想法');
+        return;
+      }
+      paint(); toast(v ? '已补上想法' : '已清空想法');
+      return;
+    }
+    paint();
+  };
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+  });
+  ta.addEventListener('blur', () => finish(true));
+  ta.addEventListener('click', e => e.stopPropagation());
+  ta.addEventListener('mousedown', e => e.stopPropagation());
 }
 function openAnnsModal() {
   const counts = amCountByBook();
@@ -2758,15 +2882,34 @@ $('#btn-anns').addEventListener('click', () => openAnnsModal());
 $('#lib-stats').addEventListener('click', e => { if (e.target.closest('#stat-anns')) openAnnsModal(); });
 $('#am-book').addEventListener('change', renderAnnsOverview);
 $('#am-note').addEventListener('change', renderAnnsOverview);
+$('#am-sort').addEventListener('change', renderAnnsOverview);
+/* 滚到底自动加载；scroll 会把 Event 当成 force 传进去，必须包一层 */
+$('#am-list').addEventListener('scroll', () => amLoadMore());
 $('#am-colors').addEventListener('click', e => {
   const bt = e.target.closest('[data-c]'); if (!bt) return;
   $$('#am-colors [data-c]').forEach(x => x.classList.toggle('cur', x === bt));
   renderAnnsOverview();
 });
-$('#am-all').addEventListener('click', () => { amFiltered().forEach(a => _amSel.add(a.id)); renderAnnsOverview(); });
-$('#am-none').addEventListener('click', () => { _amSel.clear(); renderAnnsOverview(); });
+$('#am-all').addEventListener('click', () => {
+  const list = amFiltered();
+  list.forEach(a => _amSel.add(a.id));
+  renderAnnsOverview({ keep: true });
+  /* 分批渲染后，全选会勾到当前没画出来的条目，必须说清楚 */
+  const shownN = $('#am-list').querySelectorAll('.am-item').length;
+  toast(list.length > shownN ? `已全选 ${list.length} 条（含未加载的 ${list.length - shownN} 条）` : `已全选 ${list.length} 条`);
+});
+$('#am-none').addEventListener('click', () => { _amSel.clear(); renderAnnsOverview({ keep: true }); });
 $('#am-export').addEventListener('click', exportSelectedAnns);
 $('#am-list').addEventListener('click', async e => {
+  if (e.target.closest('[data-am-more]')) { amLoadMore(true); return; }
+  const g = e.target.closest('[data-fold]');
+  if (g) {
+    const id = g.dataset.fold;
+    _amFold.has(id) ? _amFold.delete(id) : _amFold.add(id);
+    renderAnnsOverview({ keep: true }); return;
+  }
+  const nt = e.target.closest('[data-note]');
+  if (nt) { editAmNote(nt.dataset.note); return; }
   const pick = e.target.closest('[data-pick]');
   if (pick) { pick.checked ? _amSel.add(pick.dataset.pick) : _amSel.delete(pick.dataset.pick); updateAmSel(); return; }
   const item = e.target.closest('.am-item'); if (!item) return;
