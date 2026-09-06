@@ -198,6 +198,22 @@ mark.hl.has-note::after{content:"✎";font-size:.62em;color:var(--cinnabar);vert
 .ann-item .q{font-size:13px;color:var(--sub);line-height:1.7;border-left:2px solid var(--line);padding-left:10px}
 .ann-item .n{font-size:13px;color:var(--ink);background:rgba(200,16,46,.06);padding:8px 10px;margin-top:7px;line-height:1.7;white-space:pre-wrap}
 .ann-empty{padding:40px 20px;text-align:center;color:var(--aux);font-size:13px;font-family:var(--sans);line-height:2.1}
+/* 书签：不占批注的坑，位置用等宽字标出，一眼能看出是"第几章 / 第几页 / 百分之几" */
+.bm-item{cursor:pointer}
+.bm-item:hover{background:rgba(26,26,26,.03)}
+.bm-item .bm-pos{font-family:var(--mono);font-size:10px;color:var(--cinnabar);letter-spacing:.04em;flex:none}
+.bm-item .bm-x{font-family:var(--mono);font-size:11px;color:var(--aux);flex:none;padding:0 4px}
+.bm-item .bm-x:hover{color:var(--cinnabar)}
+.bm-item.flash{animation:bmFlash .9s ease 2}
+@keyframes bmFlash{0%,100%{background-color:transparent}25%,60%{background-color:rgba(200,16,46,.14)}}
+#btn-bm.on{color:var(--cinnabar);border-color:rgba(200,16,46,.35)}
+/* 顶栏按钮在窄屏上排不开：整条可横滑，不留滚动条 */
+@media (max-width:720px){
+  #reader-bar{padding:0 8px;gap:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  #reader-bar::-webkit-scrollbar{display:none}
+  #reader-bar .icon-btn{padding:7px 8px;font-size:12.5px;flex:none}
+  #rb-title{min-width:80px}
+}
 .chip.c-cinnabar{background:var(--cinnabar)}.chip.c-indigo{background:var(--indigo)}.chip.c-ochre{background:var(--ochre)}.chip.c-moss{background:var(--moss)}
 /* 定位命中闪烁：跳转后必须让用户一眼看到"跳到哪儿了" */
 @keyframes inkFlash{0%,100%{box-shadow:0 0 0 0 rgba(200,16,46,0);background-color:transparent}
@@ -426,6 +442,7 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
     <div id="rb-title" data-page-node-id="GtksbXB4D2bp9VfoUCulDs"></div>
     <span id="rb-chapter" data-page-node-id="t4CVaR5SdcV5hR0FNqmTfW"></span>
     <button class="icon-btn" id="btn-toc" data-page-node-id="SKHQVEjYZM7D22g0C5GamE">目录</button>
+    <button class="icon-btn" id="btn-bm" title="书签（⌘/Ctrl + D）" data-page-node-id="kBm7pQr2vXn4Ld8sTe1Yhc">书签</button>
     <button class="icon-btn" id="btn-annot" data-page-node-id="kTj6rbJXy9eaMR4jaYiIQ7">批注</button>
     <button class="icon-btn" id="btn-ai" data-page-node-id="xJvSng9HoAnWsoY4qxpcoz">AI</button>
     <button class="icon-btn" id="btn-speak" data-page-node-id="mJGjP9ZUoApMfCfuejQz20">朗读</button>
@@ -455,6 +472,11 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
   <aside id="toc-drawer" class="drawer" data-page-node-id="yKREhl4GbrlWMmx0rqiHVW">
     <div class="panel-head" data-page-node-id="gh2P51RGdLCLvH5pLYD4YB">目录<span class="grow" data-page-node-id="BFOxbWtEK8tjgOFHdMKwmE"></span><button class="x" data-close="toc-drawer" data-page-node-id="ibQttNRpLc0sXO4eBRBlBP">×</button></div>
     <div class="panel-body" id="toc-list" data-page-node-id="AOTJsDGbXaaRbyAwfN3HsL"></div>
+  </aside>
+  <!-- 书签侧栏 -->
+  <aside id="bm-panel" class="drawer" data-page-node-id="pBm9kLx3Qw7RvN2mHd5Tfy">
+    <div class="panel-head" data-page-node-id="sBm2nQ8vZc4JrT6yWk1Xgd">书签 · <span id="bm-count" style="font-family:var(--mono);font-size:12px" data-page-node-id="uBm4tY7bNm6HsK3pLq9Vwe">0</span><span class="grow" data-page-node-id="vBm5wD2fGj8XzR4nBc7Msv"></span><button id="bm-add" title="记下当前位置" data-page-node-id="wBm6xE3gHk9YaS5oCd8Ntw">＋</button><button class="x" data-close="bm-panel" data-page-node-id="xBm7zF4hJl0ZbT6pDe9Oux">×</button></div>
+    <div class="panel-body" id="bm-list" data-page-node-id="yBm8aG5iKm1AcU7qEf0Pvy"></div>
   </aside>
   <!-- 批注侧栏 -->
   <aside id="annot-panel" class="drawer" data-page-node-id="lN1qqHFS0Rh7BzEKsxVLh5">
@@ -1329,7 +1351,7 @@ async function openBook(id) {
     applyPrefs();
     renderChapter(b.progress.chapterIndex || 0, b.progress.scrollPct || 0);
   }
-  renderToc(); renderAnnotSidebar(); updateReaderChrome();
+  renderToc(); renderAnnotSidebar(); renderBmPanel(); updateReaderChrome(); updateBmBtn();
 }
 function closeReader() {
   saveProgressNow(); stopSpeak();
@@ -1361,7 +1383,7 @@ function renderChapter(i, restorePct) {
   for (const a of S.anns.filter(a => a.chapterIndex === i && a.type !== 'pagenote')) applyOneMark(art, a);
   const st = $('#reader-stage');
   st.scrollTop = keep * (st.scrollHeight - st.clientHeight);
-  updateReaderChrome(); renderToc();
+  updateReaderChrome(); renderToc(); updateBmBtn();
   saveProgress();
 }
 function goChapter(i) {
@@ -1437,6 +1459,110 @@ function applyOneMark(root, ann) {
 /* 收起所有抽屉。批注侧栏在手机上是全屏遮罩，不收起的话跳转后的正文完全被挡住，
    用户看到的就是"点了没反应"。 */
 function closeDrawers() { $$('.drawer').forEach(d => d.classList.remove('open')); }
+
+/* ================= M5·1 · 书签 =================
+   书签存在书记录里（b.bookmarks），跟书同生共死：备份恢复自动带上、删书一起走，
+   不用再维护一张独立的表。EPUB/TXT/MD 记「章节 + 滚动百分比」，PDF 记「页码」，
+   两者都能原样回到那一屏。 */
+function bmList(b) { return (b && Array.isArray(b.bookmarks)) ? b.bookmarks : []; }
+function bmSorted(b) {
+  const isPdf = b.format === 'pdf';
+  return bmList(b).slice().sort((x, y) => isPdf
+    ? ((x.page || 1) - (y.page || 1))
+    : ((x.chapterIndex || 0) - (y.chapterIndex || 0) || ((x.pct || 0) - (y.pct || 0))));
+}
+function bmPosLabel(b, m) {
+  if (b.format === 'pdf') return '第 ' + (m.page || 1) + ' 页';
+  const t = (b.content.chapters[m.chapterIndex || 0] || {}).title || ('第 ' + ((m.chapterIndex || 0) + 1) + ' 节');
+  return t + ' · ' + Math.round((m.pct || 0) * 100) + '%';
+}
+/* 书签要带一句摘录。列表里只有「第三章 · 42%」太干，隔几天根本认不出记的是哪一段 */
+function currentExcerpt() {
+  const b = S.current; if (!b) return '';
+  if (b.format === 'pdf') {
+    const tl = $('#pdf-text-layer');
+    const raw = (tl ? (tl.innerText || tl.textContent || '') : '').replace(/\s+/g, ' ').trim();
+    /* 文本层常把每个汉字切成一块，摘录出来是「第 一 章 版 面」，没法看。
+       只删两侧都是非 ASCII（中文/中文标点）的空格，英文单词之间的空格保留 */
+    return raw.replace(/([^\x00-\x7F]) (?=[^\x00-\x7F])/g, '$1').slice(0, 40);
+  }
+  const st = $('#reader-stage'), art = $('#reader-content');
+  if (!st || !art) return '';
+  const top = st.getBoundingClientRect().top + 6;   // 取当前视口最上面那一块，就是"你正在看的地方"
+  let hit = null;
+  for (const el of art.children) { if (el.getBoundingClientRect().bottom > top) { hit = el; break; } }
+  if (!hit) hit = art.lastElementChild;
+  return (hit ? hit.textContent : '').replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+function bmHere() {
+  const b = S.current; if (!b) return null;
+  if (b.format === 'pdf') return { page: S.pdfPage || 1, chapterIndex: curChapterIndex() };
+  return { chapterIndex: S.chapter || 0, pct: +scrollPct().toFixed(4) };
+}
+/* 同一处（同页 / 同章且滚动差 <1%）只留一枚书签，重复点不会堆出一串一样的 */
+function bmFindHere(b) {
+  const here = bmHere(); if (!here || !b) return null;
+  return bmList(b).find(m => b.format === 'pdf'
+    ? (m.page || 1) === here.page
+    : ((m.chapterIndex || 0) === here.chapterIndex && Math.abs((m.pct || 0) - (here.pct || 0)) < 0.01)) || null;
+}
+async function addBookmark() {
+  const b = S.current; if (!b) return;
+  if (!Array.isArray(b.bookmarks)) b.bookmarks = [];
+  const dup = bmFindHere(b);
+  if (dup) { toast('这个位置已经有书签了'); flashBm(dup.id); return; }
+  const m = Object.assign({ id: 'bm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: Date.now(), text: currentExcerpt() }, bmHere());
+  b.bookmarks.push(m);
+  await dbPut('books', b);
+  renderBmPanel(); updateBmBtn();
+  toast('已记下此处 · ' + bmPosLabel(b, m));
+  if ($('#bm-panel').classList.contains('open')) setTimeout(() => flashBm(m.id), 60);
+}
+async function delBookmark(id) {
+  const b = S.current; if (!b) return;
+  b.bookmarks = bmList(b).filter(x => x.id !== id);
+  await dbPut('books', b);
+  renderBmPanel(); updateBmBtn();
+}
+async function jumpToBm(id) {
+  const b = S.current; if (!b) return;
+  const m = bmList(b).find(x => x.id === id); if (!m) return;
+  closeDrawers();
+  if (b.format === 'pdf') await goPage(m.page || 1);
+  else renderChapter(m.chapterIndex || 0, m.pct || 0);
+  toast('已回到书签 · ' + bmPosLabel(b, m));
+  updateBmBtn();
+}
+function renderBmPanel() {
+  const box = $('#bm-list'), b = S.current;
+  if (!box) return;
+  if (!b) { $('#bm-count').textContent = '0'; box.innerHTML = '<div class="ann-empty">未打开书籍</div>'; return; }
+  const list = bmSorted(b);
+  $('#bm-count').textContent = list.length;
+  if (!list.length) {
+    box.innerHTML = `<div class="ann-empty">还没有书签<br>读到这里想留住，按 ⌘/Ctrl + D<br>或点右上角「＋」记下这一屏</div>`;
+    return;
+  }
+  box.innerHTML = list.map(m => `<div class="ann-item bm-item" data-bid="${m.id}" title="${new Date(m.at || Date.now()).toLocaleString('zh-CN')}">
+      <div class="row1">
+        <span class="bm-pos">${esc(bmPosLabel(b, m))}</span>
+        <span class="grow"></span>
+        <span class="bm-x" data-op="del" title="删除">×</span>
+      </div>
+      ${m.text ? `<div class="q">${esc(m.text)}</div>` : ''}
+    </div>`).join('');
+}
+/* 顶栏按钮变朱砂 = 当前这一屏已经记过了。没有这个提示，用户会反复按 D 怀疑没生效 */
+function updateBmBtn() {
+  const btn = $('#btn-bm'); if (!btn) return;
+  btn.classList.toggle('on', !!bmFindHere(S.current));
+}
+function flashBm(id) {
+  const el = $('#bm-list .bm-item[data-bid="' + id + '"]');
+  if (!el) return;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  el.scrollIntoView({ block: 'center' });
+}
 /* 清掉上一次定位留下的临时命中高亮，避免它占位干扰下一次文本匹配 */
 function clearHitMarks(root) {
   (root || $('#reader-content')).querySelectorAll('mark.hl.hit').forEach(m => {
@@ -1727,6 +1853,7 @@ async function goPage(p) {
   S.pdfPage = Math.max(1, Math.min(S.pdfDoc.numPages, p));
   S.chapter = curChapterIndex();   // 翻页后同步章节指针（批注归属依赖它）
   await renderPdfPage();
+  updateBmBtn();                   // 顶栏书签按钮的高亮跟着页码走
 }
 /* --- 朗读 --- */
 let _speaking = false;
@@ -2393,6 +2520,7 @@ function exportMarkdown() {
       });
     });
   }
+  md += bmSection(b);
   download(b.title.replace(/[\\/:*?"<>|]/g, '_') + '_批注导出.md', md, 'text/markdown;charset=utf-8');
   toast('已导出 Markdown（' + anns.length + ' 条批注）');
 }
@@ -2722,6 +2850,19 @@ function obsSafe(s) { return String(s || '').replace(/[\\/:*?"<>|#^[\]]/g, '').r
 function annBlockId(a) { return 'ink-' + String(a.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toLowerCase(); }
 function yamlStr(s) { return '"' + String(s == null ? '' : s).replace(/"/g, '\\"') + '"'; }
 
+/* 书签小节：导出成笔记后仍能找到"当时留住的是哪几处" */
+function bmSection(b) {
+  const list = bmSorted(b);
+  if (!list.length) return '';
+  let s = `\n## 书签（${list.length} 处）\n`;
+  list.forEach(m => {
+    s += `\n- **${bmPosLabel(b, m)}**`;
+    if (m.text) s += ` — ${m.text}`;
+    s += `\n`;
+  });
+  return s;
+}
+
 /* 单条批注的 Obsidian 块（带 ^block-id，可被 ![[文件#^id]] 引用） */
 function annBlock(a) {
   const color = HL_NAMES[a.color] || a.color;
@@ -2769,6 +2910,7 @@ function buildObsidianFiles(b, opts) {
     md += `## 批注（${picked.length} 条）\n`;
     if (!picked.length) md += '\n_暂无批注。_\n';
     else picked.forEach(a => { md += annBlock(a); });
+    md += bmSection(b);
     md += `\n## 原文摘录\n`;
     if (scope === 'all' && b.content.chapters && b.content.chapters.length) {
       const txt = chapterText(b.content.chapters[0]).slice(0, 6000);
@@ -2844,6 +2986,7 @@ function buildObsidianFiles(b, opts) {
     main += `\n> [!quote] ${ch.title || chName}\n`;
     main += `![[${safeTitle}/${chName}#^${annBlockId(a)}]]\n`;
   });
+  main += bmSection(b);
   files.push({ name: safeTitle + '.md', data: main });
   files.push(...chapFiles);
   return files;
@@ -3318,6 +3461,13 @@ $('#search-results').addEventListener('click', async e => {
 function toggleDrawer(id) { $('#' + id).classList.toggle('open'); }
 $('#btn-back').addEventListener('click', closeReader);
 $('#btn-toc').addEventListener('click', () => toggleDrawer('toc-drawer'));
+$('#btn-bm').addEventListener('click', () => { renderBmPanel(); toggleDrawer('bm-panel'); });
+$('#bm-add').addEventListener('click', addBookmark);
+$('#bm-list').addEventListener('click', e => {
+  const it = e.target.closest('.bm-item'); if (!it) return;
+  if (e.target.closest('[data-op="del"]')) { delBookmark(it.dataset.bid); return; }
+  jumpToBm(it.dataset.bid);
+});
 $('#btn-annot').addEventListener('click', () => toggleDrawer('annot-panel'));
 $('#btn-ai').addEventListener('click', () => toggleDrawer('ai-panel'));
 $('#btn-speak').addEventListener('click', toggleSpeak);
@@ -3499,7 +3649,7 @@ $('#btn-clear-all').addEventListener('click', async () => {
 document.addEventListener('dragover', e => { e.preventDefault(); });
 document.addEventListener('drop', e => { e.preventDefault(); if (!$('#view-library').hidden) importFiles([...e.dataTransfer.files]); });
 /* 阅读区滚动 → 进度保存 + 工具栏自动浮现 */
-$('#reader-stage').addEventListener('scroll', debounce(() => { if (!$('#view-reader').hidden) { saveProgress(); idleChrome(); } }, 400));
+$('#reader-stage').addEventListener('scroll', debounce(() => { if (!$('#view-reader').hidden) { saveProgress(); idleChrome(); updateBmBtn(); } }, 400));
 /* 净空模式：5 秒无操作隐藏工具栏；双击切换 */
 let _idleT = null;
 function idleChrome() {
@@ -3519,6 +3669,11 @@ $('#reader-stage').addEventListener('dblclick', () => $('#view-reader').classLis
 /* 键盘 */
 document.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); $('#btn-search-lib').click(); return; }
+  /* 书签：⌘/Ctrl + D 记下当前这一屏。浏览器原生是"加网页收藏"，必须拦下来 */
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'd' || e.key === 'D')) {
+    if ($('#view-reader').hidden) return;
+    e.preventDefault(); addBookmark(); return;
+  }
   if (e.key === 'Escape') {
     ['note-modal', 'search-modal', 'settings-modal'].forEach(id => { if (!$('#' + id).hidden) closeModal(id); });
     $('#typo-pop').hidden = true;
