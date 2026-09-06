@@ -344,6 +344,12 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
   .drawer{width:100%;max-width:100%}
   #typo-pop{right:8px;left:8px;width:auto}
   .modal{width:100%}
+  /* 划词工具条：手指点得中，且不超出窄屏 */
+  #sel-pop{max-width:calc(100vw - 16px);padding:9px 11px;gap:3px}
+  #sel-pop .sw{width:22px;height:22px}
+  #sel-pop .u-btn{width:30px;height:20px;margin:0 6px}
+  #sel-pop .n-btn,#sel-pop .s-btn{padding:8px 11px;font-size:13px}
+  #sel-pop .note-row input{width:100%;min-width:0;font-size:16px}
 }
 </style>
 </head>
@@ -1763,6 +1769,8 @@ function initSpeakSettings() {
 /* 划词瞬间的快照。必须快照：内联想法输入框一聚焦，浏览器就会清掉选区，
    那时再读 selection 已经是空的，保存必然失败。 */
 let _selSnap = null, _selRect = null, _lastColor = 'cinnabar';
+/* 本次选区是触摸还是鼠标产生的 —— 决定工具条放选区上方还是下方（见 positionSelPop） */
+let _selFromTouch = false;
 function captureSelRaw() {
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed) return null;
@@ -2696,9 +2704,26 @@ function positionSelPop() {
   if (!pop || pop.hidden || !r) return;
   const pw = pop.offsetWidth || 220, ph = pop.offsetHeight || 36;
   pop.style.left = Math.max(8, Math.min(window.innerWidth - pw - 8, r.left + r.width / 2 - pw / 2)) + 'px';
-  /* 上方空间不够时翻到选区下面，别被窗口顶边切掉 */
+  const vv = window.visualViewport;
+  const vh = vv ? vv.height : window.innerHeight;
+  const vTop = vv ? vv.offsetTop : 0;
+  /* 键盘弹起会把可视区压矮，此时 fixed 工具条极易被吃掉。
+     宁可偏离选区，也要保证能看见自己在打什么 —— 直接贴到可视区上部。 */
+  if (vh < window.innerHeight * 0.8) {
+    pop.style.top = (vTop + Math.max(8, Math.min(vh - ph - 8, vh * 0.16))) + 'px';
+    return;
+  }
+  /* 触摸选词时 iOS 会在选区【上方】弹原生菜单（拷贝/查询/朗读），
+     跟工具条抢同一块地方。所以触摸场景优先把工具条放到选区下方避开它；
+     鼠标场景仍按原习惯优先上方。 */
+  const below = r.bottom + 10;
   const above = r.top - ph - 10;
-  pop.style.top = (above >= 8 ? above : Math.min(window.innerHeight - ph - 8, r.bottom + 10)) + 'px';
+  if (_selFromTouch) {
+    pop.style.top = (below + ph <= vh - 8 ? below : Math.max(8, above)) + 'px';
+    return;
+  }
+  /* 上方空间不够时翻到选区下面，别被窗口顶边切掉 */
+  pop.style.top = (above >= 8 ? above : Math.min(vh - ph - 8, below)) + 'px';
 }
 /* 展开/收起内联想法输入行。展开后工具条变高，必须重新定位。 */
 function toggleSelNote(open) {
@@ -2714,10 +2739,9 @@ function saveSelNote(color) {
   const s = captureSel(); if (!s) { hideSelPop(); return; }
   addAnnotation(color || _lastColor, 'highlight', selNoteText(), s.text, s.nth);
 }
-document.addEventListener('mouseup', e => {
+/* 读取当前选区并弹出工具条。桌面走 mouseup，触摸走 touchend，两边共用这一份。 */
+function showSelPopForCurrentSelection() {
   const pop = $('#sel-pop');
-  /* 点工具条内部（尤其是想法输入框）时不要重算，否则焦点和选区都会被搅乱 */
-  if (e.target && e.target.closest && e.target.closest('#sel-pop')) return;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || !sel.toString().trim()) { hideSelPop(); return; }
   /* PDF 现在有文本层，同样支持划词；EPUB/TXT/MD 走原路径 */
@@ -2732,12 +2756,54 @@ document.addEventListener('mouseup', e => {
   pop.querySelector('.n-btn').classList.remove('active');
   const i = $('#sel-note-input'); if (i) i.value = '';
   positionSelPop();
+}
+document.addEventListener('mouseup', e => {
+  /* 点工具条内部（尤其是想法输入框）时不要重算，否则焦点和选区都会被搅乱 */
+  if (e.target && e.target.closest && e.target.closest('#sel-pop')) return;
+  _selFromTouch = false;
+  showSelPopForCurrentSelection();
+});
+/* --- 触摸选词 ---
+   iOS Safari / Android Chrome 长按选词后 mouseup 不可靠甚至不触发，
+   只监听 mouseup 的话手机上划词等于没有。所以单独监听 touchend，
+   并延迟一拍再读选区：选词把手拖动时会连续触发 touchend，
+   立即读取会拿到半截选区。滑动翻页不会留下选区，自然不会误弹。 */
+let _touchTimer = null;
+document.addEventListener('touchend', e => {
+  if (e.target && e.target.closest && e.target.closest('#sel-pop')) return;
+  clearTimeout(_touchTimer);
+  _touchTimer = setTimeout(() => { _selFromTouch = true; showSelPopForCurrentSelection(); }, 180);
+}, { passive: true });
+/* --- 残留清理 ---
+   工具条还开着时选区被清空（点了别处、系统菜单抢走焦点），必须立刻收起。
+   否则工具条继续显示、快照还是上一句，用户一点色块就把上一段文字存成批注
+   —— 静默存错内容，比不弹出来还糟。 */
+document.addEventListener('selectionchange', () => {
+  const pop = $('#sel-pop');
+  if (!pop || pop.hidden) return;
+  const ae = document.activeElement;
+  /* 只有输入框【正聚焦】时才跳过 —— 聚焦本身会让选区消失，这是正常的。
+     不能连「已展开想法行」一起跳过：那样输入框失焦后工具条就永远挂着不收。 */
+  if (ae && ae.id === 'sel-note-input') return;
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) hideSelPop();
 });
 /* 输入框要能正常聚焦，不能无差别 preventDefault */
 $('#sel-pop').addEventListener('mousedown', e => {
   if (e.target && e.target.id === 'sel-note-input') return;
   e.preventDefault();
 });
+/* 触摸版：点工具条时若不清掉默认行为，浏览器会先把选区收了，批注就存空。
+   只拦工具条内部，正文不能拦，否则没法滚动和选词。 */
+$('#sel-pop').addEventListener('touchstart', e => {
+  if (e.target && e.target.id === 'sel-note-input') return;
+  e.preventDefault();
+}, { passive: false });
+/* 软键盘弹起/收起会改变可视区高度，工具条要跟着重定位，否则被键盘吃掉 */
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => { positionSelPop(); });
+  window.visualViewport.addEventListener('scroll', () => { positionSelPop(); });
+}
 $('#sel-note-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); saveSelNote(null); }
   else if (e.key === 'Escape') {
@@ -2746,6 +2812,15 @@ $('#sel-note-input').addEventListener('keydown', e => {
     e.preventDefault(); e.stopPropagation();
     toggleSelNote(false);
   }
+});
+/* 失焦即保存。手机上没有 Esc 键，用户"写完了"的动作就是点别处 ——
+   不保存的话，辛辛苦苦打的想法一下就丢了。
+   工具条内部的按钮已被 mousedown/touchstart 的 preventDefault 挡住焦点转移，
+   所以点色块不会走到这里，不会重复保存。 */
+$('#sel-note-input').addEventListener('blur', () => {
+  const pop = $('#sel-pop');
+  if (!pop || pop.hidden || !pop.classList.contains('open-note')) return;
+  if (selNoteText()) saveSelNote(null); else hideSelPop();
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
@@ -3018,6 +3093,9 @@ function idleChrome() {
   }, 5000);
 }
 document.addEventListener('mousemove', debounce(() => { if (!$('#view-reader').hidden) idleChrome(); }, 300));
+/* 手机上没有 mousemove：工具栏一旦自动隐藏，tap 一下必须能唤回来。
+   否则只能靠双击，而双击在触屏上很容易被误判成选词或缩放。 */
+document.addEventListener('touchstart', () => { if (!$('#view-reader').hidden) idleChrome(); }, { passive: true });
 $('#reader-stage').addEventListener('dblclick', () => $('#view-reader').classList.toggle('chrome-hidden'));
 /* 键盘 */
 document.addEventListener('keydown', e => {
