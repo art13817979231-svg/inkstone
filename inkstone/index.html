@@ -210,6 +210,10 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
 #sel-pop .n-btn,#sel-pop .s-btn{font-family:var(--sans);font-size:12px;color:var(--paper);padding:3px 8px;margin-left:4px;border-left:1px solid rgba(255,255,255,.25)}
 #sel-pop .n-btn:hover,#sel-pop .s-btn:hover{color:var(--night)}
 #sel-pop .s-btn{border-left:none}
+.sp-rate-row{display:flex;align-items:center;gap:11px;margin-top:11px;font-family:var(--sans);font-size:12px;color:var(--body)}
+.sp-rate-row input[type=range]{flex:1;max-width:230px;accent-color:var(--ink);cursor:pointer}
+.sp-rate-row .val{font-family:var(--mono);font-size:12px;color:var(--ink);min-width:42px}
+.note-hint b{color:var(--ink);font-weight:400}
 /* 划词即写：工具条内联输入行，不遮挡正文 */
 #sel-pop{display:block}
 #sel-pop .row1{display:flex;align-items:center;gap:2px}
@@ -609,6 +613,23 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
       <div class="field" data-page-node-id="DyznbMi7DOiirftxyTSbf1"><label data-page-node-id="10PXkTWnFPG5bYmbMIUQOg"><input type="checkbox" id="llm-enabled" style="width:auto" data-page-node-id="o6hq2mwrckJOVxm4znoCBh"> 启用 LLM（未启用时使用本地算法，完全离线）</label></div>
       <div class="note-hint" data-page-node-id="QhunFNP87Z5pMtwz7fGS7t">密钥仅保存在本机浏览器 localStorage，不经过任何第三方服务器。</div>
       <hr style="border:none;border-top:1px solid var(--line);margin:20px 0" data-page-node-id="LaqIA6DBNRkD8XXddfbaim">
+      <div class="field" data-page-node-id="SpkFieldQ3wM8Rt">
+        <label data-page-node-id="SpkLabelK7nP2v">朗读声音</label>
+        <select id="sp-voice" data-page-node-id="SpkVoiceSelB4tX9d"></select>
+        <div class="sp-rate-row" data-page-node-id="SpkRateRowF6mQ1c">
+          <span data-page-node-id="SpkRateLabW8dL3s">语速</span>
+          <input type="range" id="sp-rate" min="0.6" max="1.5" step="0.05" data-page-node-id="SpkRateRngT2vN7h">
+          <span class="val" id="sp-rate-val" data-page-node-id="SpkRateValY5cR4k">0.95×</span>
+        </div>
+        <div style="margin-top:10px" data-page-node-id="SpkTestWrapZ9kQ6n">
+          <button class="btn small ghost" id="sp-test" data-page-node-id="SpkTestBtnN3xF8m">试听一句</button>
+        </div>
+        <div class="note-hint" style="margin-top:8px" data-page-node-id="SpkHintR7mW2p">
+          声音来自你电脑自带的语音库，本应用不联网、不上传任何文本。<br>
+          嫌机械的话：macOS 到<b>「系统设置 → 辅助功能 → 朗读内容 → 系统语音 → 管理语音」</b>里下载中文的<b>「增强 / 高级」</b>版本，装完回到这里选它，自然度会明显提升。
+        </div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:20px 0" data-page-node-id="SpkHrLineL4dV8s">
       <div class="field" data-page-node-id="gjUNvPSwlbn602E5LnAfwj"><label data-page-node-id="VMp5RaO7SalxI5VbshXzti">数据保全（批注只存在本机浏览器，请定期备份）</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
           <button class="btn small ghost" id="btn-backup-light">导出批注备份</button>
@@ -1543,13 +1564,85 @@ async function goPage(p) {
 }
 /* --- 朗读 --- */
 let _speaking = false;
-function stopSpeak() { try { window.speechSynthesis.cancel(); } catch (e) {} _speaking = false; $('#btn-speak').textContent = '朗读'; }
+/* 逐句朗读：一口气喂整章长文本，浏览器容易卡死或读到一半静默中断；
+   切成句子排队，句间有自然停顿，停止也更跟手。 */
+let _speakQ = [], _speakAt = 0;
+function voiceQuality(v) {
+  const n = (v.name || '') + ' ' + (v.voiceURI || '');
+  if (/premium|高级|Neural/i.test(n)) return 3;
+  if (/enhanced|增强/i.test(n)) return 2;
+  if (/compact|紧凑/i.test(n)) return 0;
+  return 1;
+}
+function listZhVoices() {
+  const vs = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  return vs.filter(v => /^zh|^cmn|^yue/i.test(v.lang) || /[\u4e00-\u9fa5]/.test(v.name || ''))
+    .sort((a, b) => {
+      const q = voiceQuality(b) - voiceQuality(a);
+      if (q) return q;                                  // 高级 > 增强 > 标准 > 紧凑
+      const pref = x => (/^zh-?CN|^cmn/i.test(x.lang) ? 0 : /^zh-?TW/i.test(x.lang) ? 1 : 2);
+      return pref(a) - pref(b);                          // 同档优先普通话
+    });
+}
+function pickVoice() {
+  const vs = listZhVoices();
+  if (!vs.length) return null;
+  const want = (getPrefs().speakVoice || '').trim();
+  return (want && vs.find(v => v.voiceURI === want || v.name === want)) || vs[0];
+}
+function speakRate() { const r = +getPrefs().speakRate; return r > 0 ? r : 0.95; }
+function stopSpeak() {
+  _speakQ = []; _speakAt = 0; _speaking = false;
+  try { window.speechSynthesis.cancel(); } catch (e) {}
+  const b = $('#btn-speak'); if (b) b.textContent = '朗读';
+}
+/* 按句切分：中英文标点都算断句，超长的一句再按逗号兜底切一刀。
+   手写遍历而不用 lookbehind —— 后者在旧版 Safari 上会直接抛语法错误。 */
+function splitSentences(t) {
+  const isEnd = c => '。！？!?；;…'.indexOf(c) >= 0;
+  const isSub = c => '，,、：:'.indexOf(c) >= 0;
+  const raw = []; let buf = '';
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    buf += c;
+    if (isEnd(c)) { if (buf.trim()) raw.push(buf.trim()); buf = ''; continue; }
+    /* 英文句点只在后面跟着空白或到结尾时才断，否则 1.5 会被切成 "1." 和 "5" */
+    if (c === '.' && (i + 1 >= t.length || /\s/.test(t[i + 1]))) { if (buf.trim()) raw.push(buf.trim()); buf = ''; }
+  }
+  if (buf.trim()) raw.push(buf.trim());
+  const out = [];
+  for (const s of raw) {
+    if (s.length <= 90) { out.push(s); continue; }
+    let b = '';
+    for (let i = 0; i < s.length; i++) {
+      b += s[i];
+      if (isSub(s[i]) && b.length >= 40) { out.push(b.trim()); b = ''; }
+    }
+    if (b.trim()) out.push(b.trim());
+  }
+  return out.filter(Boolean);
+}
+function _speakNext() {
+  if (!_speaking) return;
+  if (_speakAt >= _speakQ.length) { stopSpeak(); return; }
+  const u = new SpeechSynthesisUtterance(_speakQ[_speakAt]);
+  const v = pickVoice();
+  u.lang = (v && v.lang) || 'zh-CN';
+  if (v) u.voice = v;
+  u.rate = speakRate();
+  u.onend = () => { if (!_speaking) return; _speakAt++; setTimeout(_speakNext, 90); };
+  u.onerror = () => stopSpeak();
+  try { window.speechSynthesis.speak(u); }
+  catch (e) { stopSpeak(); }
+}
 function _speak(t) {
-  const u = new SpeechSynthesisUtterance(t);
-  u.lang = 'zh-CN'; u.rate = 0.95;
-  u.onend = u.onerror = () => stopSpeak();
-  window.speechSynthesis.speak(u);
-  _speaking = true; $('#btn-speak').textContent = '停止';
+  stopSpeak();
+  const chunks = splitSentences(String(t || '').replace(/\s+/g, ' ').trim());
+  if (!chunks.length) return;
+  _speakQ = chunks; _speakAt = 0; _speaking = true;
+  $('#btn-speak').textContent = '停止';
+  /* cancel() 之后立刻 speak()，Chrome 有时会静默不发声，让一帧再开始 */
+  setTimeout(_speakNext, 60);
 }
 function toggleSpeak() {
   if (_speaking) return stopSpeak();
@@ -1564,6 +1657,47 @@ function toggleSpeak() {
   const ch = S.current && S.current.content.chapters[S.chapter];
   if (!ch) return;
   _speak(chapterText(ch).slice(0, 8000));
+}
+/* 语音列表是异步就绪的，得等 onvoiceschanged */
+function fillVoiceList() {
+  const sel = $('#sp-voice'); if (!sel) return;
+  const vs = listZhVoices();
+  const cur = getPrefs().speakVoice || '';
+  const QN = { 3: '高级', 2: '增强', 1: '标准', 0: '紧凑' };
+  if (!vs.length) {
+    sel.innerHTML = '<option value="">（系统暂无中文语音）</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">自动（选最好的）</option>' + vs.map(v => {
+    const tag = QN[voiceQuality(v)] || '';
+    const remote = v.localService ? '' : ' · 云端';
+    return `<option value="${esc(v.voiceURI)}"${v.voiceURI === cur ? ' selected' : ''}>${esc(v.name)} · ${esc(v.lang)}${tag ? ' · ' + tag : ''}${remote}</option>`;
+  }).join('');
+}
+function initSpeakSettings() {
+  const sel = $('#sp-voice'), rng = $('#sp-rate'), val = $('#sp-rate-val');
+  const r = speakRate();
+  rng.value = r; val.textContent = r.toFixed(2) + '×';
+  rng.addEventListener('input', () => {
+    /* range 的 value 是 float32，直接存会得到 0.800000011920929 这种脏值 */
+    const r = Math.round(+rng.value * 100) / 100;
+    val.textContent = r.toFixed(2) + '×';
+    setPrefs({ speakRate: r });
+  });
+  sel.addEventListener('change', () => setPrefs({ speakVoice: sel.value }));
+  $('#sp-test').addEventListener('click', () => {
+    const v = sel.value ? (window.speechSynthesis.getVoices().find(x => x.voiceURI === sel.value) || null) : pickVoice();
+    const u = new SpeechSynthesisUtterance('留白不是空，是让目光知道该停在哪里。');
+    u.lang = (v && v.lang) || 'zh-CN'; if (v) u.voice = v;
+    u.rate = speakRate();
+    try { window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }
+    catch (e) { toast('试听失败：' + e.message); }
+  });
+  fillVoiceList();
+  if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = () => fillVoiceList();
+    setTimeout(fillVoiceList, 400);   // 有些浏览器首次是空的，稍后再取一次
+  }
 }
 
 /* ================= M6 · 批注 ================= */
@@ -2646,6 +2780,7 @@ $('#btn-settings').addEventListener('click', () => {
   $('#llm-key').value = c.apiKey || '';
   $('#llm-model').value = c.model || '';
   $('#llm-enabled').checked = !!c.enabled;
+  fillVoiceList();   // 每次打开都重取：系统里新装的语音要能立刻选到
   openModal('settings-modal');
 });
 $('#settings-save').addEventListener('click', () => {
@@ -2762,6 +2897,7 @@ async function seedSample() {
     if (!S.books.length) await seedSample();
     applyPrefs();
     renderLibrary();
+    initSpeakSettings();
     idleChrome();
   } catch (err) {
     console.error(err);
