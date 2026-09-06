@@ -4,6 +4,13 @@
 <meta charset="utf-8" data-page-node-id="26KlJ16lkAK5lU4g76o0q5">
 <meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="U6Ab9XLkvPDSK46GZy82ZQ">
 <title>墨砚 Inkstone · 阅读器</title>
+<meta name="theme-color" content="#fafaf7">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="墨砚">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23fafaf7'/%3E%3Ccircle cx='32' cy='36' r='14' fill='%231a1a1a'/%3E%3Ccircle cx='27' cy='18' r='4' fill='%231a1a1a'/%3E%3C/svg%3E" data-page-node-id="C2VlrvEaEktexjhh8drwuD">
 <style>
 /* ============ 墨砚 Inkstone · Swiss 极简设计系统 ============ */
@@ -724,6 +731,15 @@ mark.hl.flash{animation:inkFlash .9s ease 2;outline:1px solid rgba(200,16,46,.5)
           <button class="btn small ghost" id="btn-sidx-rebuild">重建索引</button>
         </div>
         <div class="note-hint" style="margin-top:8px">导入时自动建立，之后一直复用；删书或正文变动会自动作废重建。它只是缓存，删掉不丢任何数据，最多下次检索慢一点（会自动重算）。</div>
+      </div>
+      <div class="field"><label>安装（装进手机 / 电脑桌面，变成一个独立应用）</label>
+        <div class="stg-guard">
+          <div class="row"><span class="k">安装状态</span><span class="v" id="stg-installed">检测中…</span></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn small" id="btn-install" hidden>安装到本机</button>
+        </div>
+        <div class="note-hint" id="install-hint" style="margin-top:8px">装好即得桌面图标：全屏无地址栏，断网也能读。书和批注仍只存在本机。</div>
       </div>
       <div class="field" data-page-node-id="gjUNvPSwlbn602E5LnAfwj2"><label data-page-node-id="VMp5RaO7SalxI5VbshXzti2">危险操作</label>
         <button class="btn small ghost" id="btn-clear-all" data-page-node-id="DZpDtV9GKkQoYfAFV9BF7A" style="border-color:#c8102e;color:#c8102e">清空书架与批注</button>
@@ -3211,7 +3227,7 @@ function renderBackupHint() {
 function closeModal(id) { $('#' + id).classList.add('closing'); $('#' + id).hidden = true; }
 function openModal(id) {
   $('#' + id).hidden = false;
-  if (id === 'settings-modal') { renderSidxStatus(); return; }
+  if (id === 'settings-modal') { renderSidxStatus(); renderInstall(); return; }
   if (id === 'search-modal') { renderSidxStatus(); ensureAllIndexes(); }   // 开检索就顺手把缺的索引补上
 }
 document.addEventListener('click', e => {
@@ -3625,6 +3641,51 @@ $('#backup-hint').addEventListener('click', e => {
   openModal('settings-modal');
 });
 $('#stg-persist-btn').addEventListener('click', () => askPersist(true));
+
+/* ================= PWA 安装 =================
+   三种世界，三种说法：Chrome/Edge 给 beforeinstallprompt（可一键装）；
+   iOS Safari 不给事件，只能引导「分享 → 添加到主屏幕」；
+   已装（standalone 模式）就不该再显示安装按钮。 */
+let _installEvt = null;
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function renderInstall() {
+  const st = $('#stg-installed'), btn = $('#btn-install'), hint = $('#install-hint');
+  if (!st) return;
+  const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isStandalone()) {
+    st.textContent = '已安装 ✓'; st.style.color = 'var(--moss)';
+    btn.hidden = true;
+    hint.textContent = '正以独立窗口运行。书和批注仍只存在本机，不会上传。';
+  } else if (_installEvt) {
+    st.textContent = '可以安装';
+    st.style.color = '';
+    btn.hidden = false;
+    hint.textContent = '点「安装到本机」，浏览器会弹出确认。装好即得桌面图标：全屏独立窗口，断网也能读。';
+  } else if (iOS) {
+    st.textContent = 'iPhone / iPad：手动添加';
+    btn.hidden = true;
+    hint.innerHTML = '用 Safari 打开本页 → 底部「分享」按钮 → 往下滑点「添加到主屏幕」→ 确认。桌面即出现「墨砚」图标，全屏独立运行。<br>注意：添加后首次打开书架可能是空的，先在浏览器里导出一份备份，到图标里再恢复一次。';
+  } else {
+    st.textContent = '可通过浏览器菜单安装';
+    btn.hidden = true;
+    hint.innerHTML = 'Chrome / Edge：地址栏右侧 ⊕ 图标，或菜单 →「安装应用」；Mac Safari：菜单「文件 → 添加到程序坞」。';
+  }
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _installEvt = e; renderInstall(); });
+window.addEventListener('appinstalled', () => { _installEvt = null; renderInstall(); toast('墨砚已安装，去桌面找「墨砚」图标'); });
+$('#btn-install').addEventListener('click', async () => {
+  if (!_installEvt) return;
+  _installEvt.prompt();
+  const r = await _installEvt.userChoice.catch(() => null);
+  _installEvt = null; renderInstall();
+  if (r && r.outcome === 'accepted') toast('正在安装墨砚…');
+});
+/* 离线可用：注册 Service Worker（只在 http/https 下注册，file:// 双击打开时静默跳过） */
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
 
 $('#btn-sidx-rebuild').addEventListener('click', async () => {
   const btn = $('#btn-sidx-rebuild');
